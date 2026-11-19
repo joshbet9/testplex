@@ -879,7 +879,14 @@ public final class SpeedBuildersGame implements Listener {
                     state.score, currentTemplate.expectedScore());
             if (perfectBuild && !state.perfect) {
                 markPerfectBuild(state);
-            } else if (!perfectBuild) {
+            }
+            if (!perfectBuild) {
+                if (state.secondDraftStarted) {
+                    state.secondDraftMaintained = false;
+                } else if (round < matchRoundLimit) {
+                    state.secondDraftStarted = true;
+                    state.secondDraftMaintained = true;
+                }
                 state.perfect = false;
                 state.perfectedEveryBuild = false;
                 state.rapidPerfectStreak = 0;
@@ -1011,6 +1018,11 @@ public final class SpeedBuildersGame implements Listener {
         }
         persistMatchProgress(winnerIds);
         for (PlayerState state : matchHistory) {
+            if (!GameDebugRuntimeOverrides.isDebugSession()
+                    && SpeedBuildersRules.secondDraft(winnerIds.contains(state.player.getUniqueId()),
+                            state.secondDraftStarted, state.secondDraftMaintained)) {
+                awardAchievement(state.player.getUniqueId(), "speed-master");
+            }
             if (!GameDebugRuntimeOverrides.isDebugSession() && winnerIds.contains(state.player.getUniqueId())
                     && round > 0 && state.perfectBuilds == round) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(),
@@ -1945,6 +1957,8 @@ public final class SpeedBuildersGame implements Listener {
         private int rapidPerfectStreak;
         private int roundBlocksBroken;
         private boolean finalRoundLastSecondPerfect;
+        private boolean secondDraftStarted;
+        private boolean secondDraftMaintained;
         private int blocksPlaced;
         private int blocksBroken;
         private int mobsBuilt;

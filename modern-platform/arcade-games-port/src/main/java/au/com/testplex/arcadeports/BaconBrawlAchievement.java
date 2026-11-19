@@ -7,7 +7,7 @@ import java.util.UUID;
  * Keys are deliberately namespaced to the isolated Testplex config, not production Mineplex data.
  */
 public enum BaconBrawlAchievement {
-    KING_OF_BACON("king-of-bacon", "King of Bacon", "Win 15 games of Bacon Brawl."),
+    WELL_DONE("king-of-bacon", "Well Done", "Win Bacon Brawl with at least 3 credited kills, and have every credited kill be a critical hit."),
     PIGS_IN_BLANKETS("pigs-in-blankets", "Pigs In Blankets", "Kill 6 players in one game."),
     FLASH_FRIED("flash-fried", "Flash Fried", "Win Bacon Brawl in 60 seconds or less."),
     RAW_PORK("raw-pork", "Raw Pork", "Win Bacon Brawl without using an ability."),

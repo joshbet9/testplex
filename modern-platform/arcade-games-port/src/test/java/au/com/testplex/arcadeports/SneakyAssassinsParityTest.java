@@ -10,6 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class SneakyAssassinsParityTest {
 
     @Test
+    void noWitnessesRequiresWinningWithoutDroppingBelowSevenAndHalfHearts() {
+        assertTrue(SneakyAssassinsRules.noWitnesses(true, 15.0D));
+        assertFalse(SneakyAssassinsRules.noWitnesses(true, 14.99D));
+        assertFalse(SneakyAssassinsRules.noWitnesses(false, 20.0D));
+    }
+
+    @Test
     void ambientTownVillagersUseTheirNormalMobAi() {
         assertTrue(SneakyAssassinsRules.ambientVillagerAiEnabled());
     }
@@ -250,7 +257,6 @@ class SneakyAssassinsParityTest {
         assertEquals("i-see-you", SneakyAssassinsRules.achievementForLifetimeStat("i-see-you", 50));
         assertNull(SneakyAssassinsRules.achievementForLifetimeStat("master-assassin", 9));
         assertEquals("master-assassin", SneakyAssassinsRules.achievementForLifetimeStat("master-assassin", 10));
-        assertEquals(15, SneakyAssassinsRules.SO_SO_SNEAKY_WINS_REQUIRED);
     }
 
 }

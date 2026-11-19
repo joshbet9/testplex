@@ -658,17 +658,9 @@ public final class ArcadePortRules {
     public static final int BOMB_LOBBERS_ULTIMATE_KILLER_KILLS = 5;
     public static final int BOMB_LOBBERS_TWO_BIRDS_KILLS = 2;
     public static final int BOMB_LOBBERS_TEAM_PLAYER_ASSISTS = 5;
-    public static final int BOMB_LOBBERS_MASTER_BOMBER_WINS = 30;
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
-    /** The updated King of Bacon achievement requires fifteen wins on the isolated test server. */
-    public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
-
-    public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
-        return totalWins >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_KING_OF_BACON_WINS", BACON_BRAWL_KING_OF_BACON_WINS);
-    }
-
     public static boolean shouldRecordBaconBrawlAchievements(boolean debugRound,
                                                               boolean announcedWin,
                                                               boolean hasWinner) {
@@ -898,9 +890,6 @@ public final class ArcadePortRules {
     }
     public static boolean shouldAwardBombLobbersDoubleJump(boolean won, boolean aliveAtFinish, boolean usedDoubleJump) {
         return won && aliveAtFinish && !usedDoubleJump;
-    }
-    public static boolean shouldAwardBombLobbersMasterBomber(int winsAfterCurrentGame) {
-        return winsAfterCurrentGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_MASTER_BOMBER_WINS", BOMB_LOBBERS_MASTER_BOMBER_WINS);
     }
     public static String bombLobbersAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
         if (playerId == null || achievementSlug == null || !achievementSlug.matches("[a-z0-9-]+")) return "";
@@ -3066,7 +3055,6 @@ public final class ArcadePortRules {
     public static final int SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD = 3;
     public static final int SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT = 100;
     public static final int SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT = 100;
-    public static final int SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS = 20;
     public static final int SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD = 12;
     public static final int SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET = 5;
     public static final long SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS = 5_000L;
@@ -3170,10 +3158,6 @@ public final class ArcadePortRules {
     public static boolean sheepQuestAnimalRescueAchievementReached(int count) {
         return count >= GameDebugRuntimeOverrides.intValue(
                 "SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT", SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT);
-    }
-    public static boolean sheepQuestHungryHungryHippoAchievementReached(int wins) {
-        return wins >= GameDebugRuntimeOverrides.intValue(
-                "SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS", SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS);
     }
     public static boolean sheepQuestSelfishAchievementReached(int teamSheep) {
         return teamSheep > GameDebugRuntimeOverrides.intValue(

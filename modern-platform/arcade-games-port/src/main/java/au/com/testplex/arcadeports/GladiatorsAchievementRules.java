@@ -13,6 +13,10 @@ final class GladiatorsAchievementRules {
 
     private GladiatorsAchievementRules() { }
 
+    static boolean poisonedPatience(int creditedPoisonKills) {
+        return creditedPoisonKills >= 3;
+    }
+
     static int addHit(int hitMask, int hitType) {
         return hitMask | hitType;
     }

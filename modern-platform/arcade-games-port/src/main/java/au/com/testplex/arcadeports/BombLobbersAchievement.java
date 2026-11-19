@@ -11,7 +11,8 @@ public enum BombLobbersAchievement {
     THE_MVP("the-mvp", "The MVP", "Win against 3 opponents while the last living member of your team."),
     BLAST_PROOF("blast-proof", "Blast Proof", "Win 10 games as Armorer."),
     JELLY_SKIN("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
-    MASTER_BOMBER("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
+    MASTER_BOMBER("master-bomber", "Close Shave",
+            "Win with the final TNT elimination while you and the eliminated opponent are both at 1 heart or less."),
     GRENADE_FROM_THE_GRAVE("grenade-from-the-grave", "Grenade From the Grave",
             "Get 2 kills after you die in one Bomb Lobbers game.");
 
@@ -30,6 +31,11 @@ public enum BombLobbersAchievement {
     public String requirement() { return requirement; }
     public static boolean shouldAwardGrenadeFromTheGrave(int postDeathKills) {
         return postDeathKills >= 2;
+    }
+
+    static boolean closeShave(boolean finalOpponent, double killerHealth, double victimHealth) {
+        return finalOpponent && Double.isFinite(killerHealth) && Double.isFinite(victimHealth)
+                && killerHealth <= 2.0D && victimHealth <= 2.0D;
     }
 
     public String configKey(UUID playerId) {

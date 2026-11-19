@@ -7228,7 +7228,9 @@ public final class ArcadePortManager implements Listener {
         int value = plugin.getConfig().getInt(path + stat, 0) + amount;
         plugin.getConfig().set(path + stat, value);
         plugin.saveConfig();
-        if (value >= achievementThreshold) awardCatalogAchievement(player, "gladiators", achievementId);
+        if (achievementId != null && !achievementId.isBlank() && value >= achievementThreshold) {
+            awardCatalogAchievement(player, "gladiators", achievementId);
+        }
     }
 
     private static final int GLADIATOR_BRACKET_WINNERS = 0;
@@ -8383,7 +8385,17 @@ public final class ArcadePortManager implements Listener {
             if (!ArcadePortRules.shouldGladiatorPoison(now, roundStarted, false, fighters.size())) continue;
             for (Player player : fighters) {
                 if (player.getHealth() <= GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POISON_DAMAGE", ArcadePortRules.GLADIATOR_POISON_DAMAGE)) {
+                    Player poisonWinner = fighters.stream()
+                            .filter(fighter -> !fighter.getUniqueId().equals(player.getUniqueId()))
+                            .findFirst().orElse(null);
                     eliminate(session, player, null, "was defeated by arena poison");
+                    if (poisonWinner != null && session.alive.contains(poisonWinner.getUniqueId())) {
+                        int poisonKills = session.gladiatorPoisonKills.merge(
+                                poisonWinner.getUniqueId(), 1, Integer::sum);
+                        if (GladiatorsAchievementRules.poisonedPatience(poisonKills)) {
+                            awardCatalogAchievement(poisonWinner, "gladiators", "swift-kill");
+                        }
+                    }
                     break;
                 }
                 player.setHealth(player.getHealth() - GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POISON_DAMAGE", ArcadePortRules.GLADIATOR_POISON_DAMAGE));
@@ -10930,6 +10942,9 @@ public final class ArcadePortManager implements Listener {
         if (session == null || victim == null || killer == null || killer.equals(victim)
                 || !session.players.containsKey(killer.getUniqueId())) return;
         UUID killerId = killer.getUniqueId();
+        SkyWarsAchievementRules.MatchTracker achievementTracker = skyWarsAchievementTracker(session, killerId);
+        achievementTracker.recordLastHeartInTheSky(session.alive.size() == 2, killer.getHealth());
+        achievementTracker.recordGravityAccountantElimination(victim.getFallDistance());
         if (SkyWarsAchievementRules.highGroundElimination(killer.getLocation().getY(), victim.getLocation().getY())
                 && skyWarsAchievementTracker(session, killerId)
                         .recordHighGroundElimination(victim.getUniqueId(), killer.getLocation().getY(),
@@ -10946,9 +10961,6 @@ public final class ArcadePortManager implements Listener {
         int lifetimeKills = plugin.getConfig().getInt(path + "kills", 0) + 1;
         plugin.getConfig().set(path + "kills", lifetimeKills);
         plugin.saveConfig();
-        if (SkyWarsAchievementRules.reached(lifetimeKills, SkyWarsAchievementRules.COLD_BLOODED_KILLS)) {
-            awardCatalogAchievement(killer, "skywars", "cold-blooded-killer");
-        }
     }
 
     private void addSkyWarsIceBridge(Session session, Player player, long expiresAt) {
@@ -11759,6 +11771,8 @@ public final class ArcadePortManager implements Listener {
         }
         session.dragonIceBridgeOriginals.clear();
         session.dragonIceBridgeExpiresAt.clear();
+        session.dragonIceBridgeOwners.clear();
+        session.dragonSnowPatrolCandidates.clear();
         session.dragonFrostBridgePaths.clear();
         session.dragonFrostBridgePathIndexes.clear();
         session.dragonFrostVoidChallengePaths.clear();
@@ -11770,6 +11784,7 @@ public final class ArcadePortManager implements Listener {
             Map.Entry<Block, Long> entry = it.next();
             if (now < entry.getValue()) continue;
             Block block = entry.getKey(); BlockData original = session.dragonIceBridgeOriginals.remove(block);
+            session.dragonIceBridgeOwners.remove(block);
             if (block != null && block.getWorld() == session.world && original != null
                     && block.getType() == Material.ICE) block.setBlockData(original, false);
             it.remove();
@@ -11790,6 +11805,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonFrostBridgePathIndexes.put(playerId, index + 1);
             if (isDragonFrostPlacementSafe(session, block, null)) {
                 session.dragonIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+                session.dragonIceBridgeOwners.put(block, playerId);
                 session.dragonIceBridgeExpiresAt.put(block,
                         now + GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS", ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS));
                 block.setType(Material.ICE, false);
@@ -16438,6 +16454,7 @@ public final class ArcadePortManager implements Listener {
         // critical while Crispy Bacon's fire is active, matching the kit's source behavior.
         boolean critical = normalTimedHit
                 && (crispyFlamed || vanillaCritical || session.baconSwingCritical.contains(attackerId));
+        session.baconLastHitCritical.put(targetId, critical);
         if (critical) timingMultiplier = Math.max(1.6D, timingMultiplier);
 
         String kit = session.baconKits.getOrDefault(attackerId, "el-muchacho-pigo");
@@ -16566,6 +16583,13 @@ public final class ArcadePortManager implements Listener {
         int winningTeam = winner == null ? -1 : session.teams.getOrDefault(winner.getUniqueId(), -1);
         int losingTeam = winningTeam == 0 ? 1 : 0;
         if (winningTeam >= 0) {
+            for (UUID id : session.turfFinalBounceKillers) {
+                if (session.teams.getOrDefault(id, -1) == winningTeam) {
+                    awardCatalogAchievement(session.players.get(id), "turf-wars", "turf-master-3000");
+                }
+            }
+        }
+        if (winningTeam >= 0) {
             int losingKills = session.players.keySet().stream()
                     .filter(id -> session.teams.getOrDefault(id, -1) == losingTeam)
                     .mapToInt(id -> session.scores.getOrDefault(id, 0)).sum();
@@ -16629,6 +16653,9 @@ public final class ArcadePortManager implements Listener {
         if (session == null || winner == null) return;
         UUID winnerId = winner.getUniqueId();
         String kit = session.spleefKits.getOrDefault(winnerId, "snowballer");
+        if (SpleefAchievementRules.onlySquareAreas(session.spleefBrokenPositions.get(winnerId))) {
+            awardCatalogAchievement(winner, "spleef", "spleef-king-or-queen");
+        }
         if (SpleefAchievementRules.brawlersGambit(kit, true,
                 session.spleefFinalSmashBlocks.getOrDefault(winnerId, 0),
                 !session.spleefEliminations.isEmpty()
@@ -18734,6 +18761,7 @@ public final class ArcadePortManager implements Listener {
                 plugin.saveConfig();
             }
         }
+        awardDragonEscapePhotoFinish(session);
         // Test bots are real racers for placement, finish-window progression, and chat
         // announcements, but they must not create persistent PBs, ghosts, or progression.
         if (!persistentPlayer || session.dragonEscapeMapResource == null) return;
@@ -18834,6 +18862,24 @@ public final class ArcadePortManager implements Listener {
         dragonEscapePbTrackCache.remove(dragonEscapeGhostCacheKey(id, session.dragonEscapeMapResource, kit));
         announceDragonEscapeRecordMilestone(session, player, kit, elapsed, existing, previousKitPb,
                 previousWorldRecord, previousKitWorldRecord, improvedKit, firstFinisher);
+    }
+
+    private void awardDragonEscapePhotoFinish(Session session) {
+        if (session == null || session.dragonEscapeStoppedTimesMillis.size() < 2) return;
+        List<Map.Entry<UUID, Long>> humanFinishers = session.dragonEscapeStoppedTimesMillis.entrySet().stream()
+                .filter(entry -> session.dragonEscapeCompleted.contains(entry.getKey()))
+                .filter(entry -> !testPlayers.isTestPlayer(entry.getKey()))
+                .sorted(Map.Entry.comparingByValue())
+                .limit(2)
+                .toList();
+        if (humanFinishers.size() != 2) return;
+        Map.Entry<UUID, Long> first = humanFinishers.get(0);
+        Map.Entry<UUID, Long> second = humanFinishers.get(1);
+        if (!DragonEscapeAchievementRules.photoFinish(first.getValue(), second.getValue())) return;
+        Player winner = session.players.get(first.getKey());
+        if (winner != null && winner.isOnline()) {
+            awardCatalogAchievement(winner, "dragon-escape", "douglas-defeater");
+        }
     }
 
     private void announceDragonEscapeRecordMilestone(Session session, Player player, String kit, long elapsed,
@@ -20224,6 +20270,11 @@ public final class ArcadePortManager implements Listener {
         if (session == null || playerId == null) return;
         long now = System.currentTimeMillis();
         session.sheepQuestCaptures.merge(playerId, 1, Integer::sum);
+        int carrierTeam = session.teams.getOrDefault(playerId, -1);
+        if (previousOwner >= 0 && previousOwner != carrierTeam) {
+            session.sheepQuestCapturedFromPenTeams.computeIfAbsent(playerId, ignored -> new HashSet<>())
+                    .add(previousOwner);
+        }
         session.sheepQuestCaptureTimes.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(now);
         Set<UUID> defeatedFromPenTeam = session.sheepQuestSoloCarryVictimsByTeam
                 .getOrDefault(playerId, Map.of()).getOrDefault(previousOwner, Set.of());
@@ -20280,12 +20331,14 @@ public final class ArcadePortManager implements Listener {
                     session.sheepQuestWasEliminated.contains(playerId))) {
                 awardCatalogAchievement(player, "sheep-quest", "clean-getaway");
             }
+            if (SheepQuestAchievementRules.wageWar(
+                    session.teams.getOrDefault(playerId, -1),
+                    session.sheepQuestCapturedFromPenTeams.getOrDefault(playerId, Set.of()))) {
+                awardCatalogAchievement(player, "sheep-quest", "hungry-hungry-hippo");
+            }
             String path = localStatsPath(playerId, "sheep-quest");
             int wins = plugin.getConfig().getInt(path + "wins", 0) + 1;
             plugin.getConfig().set(path + "wins", wins);
-            if (ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(wins)) {
-                awardCatalogAchievement(player, "sheep-quest", "hungry-hungry-hippo");
-            }
             if (ArcadePortRules.sheepQuestSelfishAchievementReached(sheepQuestTeamCount(session, winnerTeam))) {
                 awardCatalogAchievement(player, "sheep-quest", "selfish");
             }
@@ -21043,6 +21096,9 @@ public final class ArcadePortManager implements Listener {
                     playerId, killer.getUniqueId(), session.scores.containsKey(killer.getUniqueId()))) {
                 UUID killerId = killer.getUniqueId();
                 int kills = session.scores.merge(killerId, 1, Integer::sum);
+                boolean creditedCritical = killerId.equals(session.lastHitKillerByVictim.get(playerId))
+                        && session.baconLastHitCritical.getOrDefault(playerId, false);
+                session.baconAchievements.recordCreditedKill(killerId, creditedCritical);
                 if (ArcadeTestPlayerManager.shouldPersistProgression(
                         killerId, testPlayers.isTestPlayer(killerId))) {
                     String statsPath = localStatsPath(killerId, ArcadePortGame.BACON_BRAWL.id());
@@ -21063,6 +21119,7 @@ public final class ArcadePortManager implements Listener {
                             "Pigs In Blankets — 6 kills in one game.");
                 }
             }
+            session.baconLastHitCritical.remove(playerId);
             if (player.isOnline()) {
                 // Do not leave Brutus' short resistance effect running on an eliminated spectator.
                 player.removePotionEffect(PotionEffectType.RESISTANCE);
@@ -21304,6 +21361,16 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapeStoppedTimesMillis.putIfAbsent(
                     eliminatedId, Math.max(0L, System.currentTimeMillis() - session.startedAt));
         }
+        if (session.type == ArcadePortGame.TURF_WARS) {
+            UUID bounceShooter = session.turfBounceHitByTarget.remove(eliminatedId);
+            long bounceAt = session.turfBounceHitAt.getOrDefault(eliminatedId, 0L);
+            session.turfBounceHitAt.remove(eliminatedId);
+            if (session.alive.size() == 2 && killer != null
+                    && killer.getUniqueId().equals(bounceShooter)
+                    && System.currentTimeMillis() - bounceAt <= 4_000L) {
+                session.turfFinalBounceKillers.add(bounceShooter);
+            }
+        }
         if (!session.alive.remove(eliminatedId)) return;
         if (session.type == ArcadePortGame.SPLEEF) {
             SpleefHit hit = session.spleefLastHit.get(eliminatedId);
@@ -21321,6 +21388,12 @@ public final class ArcadePortManager implements Listener {
                             ? hit.kind() : "other",
                     hit != null && killerId != null && killerId.equals(hit.attackerId())
                             && hit.targetAirborne(), fallElimination && sameSmash, smashBlocks));
+            if (killerId != null) {
+                int creditedEliminations = session.spleefCreditedEliminations.merge(killerId, 1, Integer::sum);
+                if (SpleefAchievementRules.sinkhole(creditedEliminations)) {
+                    awardCatalogAchievement(killer, "spleef", "demolitionist");
+                }
+            }
             session.spleefLastHit.remove(eliminatedId);
             session.spleefBrawlerSmashVictims.remove(eliminatedId);
         }
@@ -21795,7 +21868,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (!session.gladiatorSwiftKillRecorded) {
                 session.gladiatorSwiftKillRecorded = true;
-                incrementGladiatorsLifetimeStat(killer, "swift-kill", 1, 15, "swift-kill");
+                incrementGladiatorsLifetimeStat(killer, "swift-kill", 1, 15, null);
             }
             announceGladiatorKill(session, killer, victim);
         }
@@ -24063,6 +24136,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastDamagedAt.clear();
         session.baconLastHitAtByPair.clear();
         session.baconLastHitSource.clear();
+        session.baconLastHitCritical.clear();
         session.baconBlastCombosByVictim.clear();
         session.baconSlamRecoveries.clearAll();
         session.baconAchievements.clearAll();
@@ -24200,10 +24274,9 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        int totalWins = plugin.getConfig().getInt(localStatsPath(id, ArcadePortGame.BACON_BRAWL.id()) + "wins", 0);
-        if (ArcadePortRules.shouldAwardBaconKingOfBacon(totalWins)) {
-            awardBaconAchievement(winner, BaconBrawlAchievement.KING_OF_BACON.configKey(id),
-                    "King of Bacon — 15 Bacon Brawl wins.");
+        if (session.baconAchievements.qualifiesWellDone(id)) {
+            awardBaconAchievement(winner, BaconBrawlAchievement.WELL_DONE.configKey(id),
+                    "Well Done — won with at least 3 kills, all critical hits.");
         }
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
@@ -24355,11 +24428,9 @@ public final class ArcadePortManager implements Listener {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.JELLY_SKIN.configKey(winnerId),
                         "Jelly Skin — won without taking damage.");
             }
-            int wins = plugin.getConfig().getInt(
-                    localStatsPath(winnerId, ArcadePortGame.BOMB_LOBBERS.id()) + "wins", 0);
-            if (ArcadePortRules.shouldAwardBombLobbersMasterBomber(wins)) {
+            if (session.bombCloseShaveCandidates.contains(winnerId)) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.MASTER_BOMBER.configKey(winnerId),
-                        "Master Bomber — won 30 Bomb Lobbers games.");
+                        BombLobbersAchievement.MASTER_BOMBER.displayName() + " - " + BombLobbersAchievement.MASTER_BOMBER.requirement());
             }
         }
     }
@@ -24413,9 +24484,6 @@ public final class ArcadePortManager implements Listener {
     private void recordDragonEscapeAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
         String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
-        if (ArcadePortRules.shouldAwardDragonEscapeDefeater(plugin.getConfig().getInt(statsPath + "wins", 0))) {
-            awardCatalogAchievement(winner, "dragon-escape", "douglas-defeater");
-        }
         if (!session.dragonEscapeLeaped.contains(id)) {
             awardCatalogAchievement(winner, "dragon-escape", "paralympics");
         }
@@ -24903,9 +24971,6 @@ public final class ArcadePortManager implements Listener {
                 if (blocksBroken > 0) {
                     int lifetimeBlocks = plugin.getConfig().getInt(path + "blocks-broken", 0) + blocksBroken;
                     plugin.getConfig().set(path + "blocks-broken", lifetimeBlocks);
-                    if (lifetimeBlocks >= SpleefAchievementRules.DEMOLITIONIST_BLOCKS) {
-                        awardCatalogAchievement(id, "spleef", "demolitionist");
-                    }
                 }
             }
             if (!session.alive.contains(id) && ArcadePortRules.shouldRecordKnockoutsStat(session.type)) {
@@ -24932,6 +24997,15 @@ public final class ArcadePortManager implements Listener {
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
+            if (session.type == ArcadePortGame.SKY_WARS && won) {
+                SkyWarsAchievementRules.MatchTracker skyWarsTracker = session.skyWarsAchievementTrackers.get(id);
+                if (skyWarsTracker != null && skyWarsTracker.lastHeartInTheSky()) {
+                    awardCatalogAchievement(entry.getValue(), "skywars", "sky-king");
+                }
+                if (skyWarsTracker != null && skyWarsTracker.gravityAccountant()) {
+                    awardCatalogAchievement(entry.getValue(), "skywars", "cold-blooded-killer");
+                }
+            }
             if (session.type == ArcadePortGame.DEATH_TAG && won && session.alive.contains(id)
                     && !session.tagged.contains(id)
                     && session.deathTagAchievements.survivedThreeChasers(id)) {
@@ -24972,21 +25046,9 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 int lifetimeWins = plugin.getConfig().getInt(path + "wins", 0) + 1;
                 plugin.getConfig().set(path + "wins", lifetimeWins);
-                if (session.type == ArcadePortGame.SPLEEF
-                        && lifetimeWins >= SpleefAchievementRules.KING_OR_QUEEN_WINS) {
-                    awardCatalogAchievement(entry.getValue(), "spleef", "spleef-king-or-queen");
-                }
-                if (session.type == ArcadePortGame.TURF_WARS
-                        && lifetimeWins >= TurfWarsAchievementRules.TURF_MASTER_WINS) {
-                    awardCatalogAchievement(entry.getValue(), "turf-wars", "turf-master-3000");
-                }
-                if (session.type == ArcadePortGame.SKY_WARS
-                        && SkyWarsAchievementRules.reached(lifetimeWins, SkyWarsAchievementRules.SKY_KING_WINS)) {
-                    awardCatalogAchievement(entry.getValue(), "skywars", "sky-king");
-                }
-                if (session.type == ArcadePortGame.DRAGONS && lifetimeWins >= 15) {
+                if (session.type == ArcadePortGame.DRAGONS && session.dragonSnowPatrolCandidates.contains(id)) {
                     awardDragonAchievement(id, entry.getValue(), "dragon-tamer",
-                            "Dragon Tamer — win 15 Dragons games.");
+                            "Snow Patrol: as Frost, create an Ice Bridge another player uses to escape a fall, then win Dragons.");
                 }
                 if (session.type == ArcadePortGame.BOMB_LOBBERS
                         && ArcadePortRules.shouldCountBombLobbersArmorerWin(true,
@@ -27851,6 +27913,17 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.DRAGONS && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)
+                && !event.getFrom().getBlock().equals(event.getTo().getBlock())) {
+            Block landing = event.getTo().getBlock().getRelative(BlockFace.DOWN);
+            UUID frostOwner = session.dragonIceBridgeOwners.get(landing);
+            if (frostOwner != null && session.alive.contains(frostOwner)
+                    && DragonsAchievementRules.snowPatrolRescue(frostOwner, playerId,
+                            player.getFallDistance(), session.alive.contains(playerId))) {
+                session.dragonSnowPatrolCandidates.add(frostOwner);
+            }
+        }
         if (session.type == ArcadePortGame.SKY_WARS && session.alive.contains(playerId)
                 && !(event instanceof PlayerTeleportEvent) && event.getTo().getWorld() == session.world
                 && !session.skyWarsIceBridgeCrossed.contains(playerId)) {
@@ -28643,13 +28716,11 @@ public final class ArcadePortManager implements Listener {
         if (isSpleefProtectedBlock(block.getType())) return;
         if (breaker != null) {
             UUID breakerId = breaker.getUniqueId();
+            session.spleefBrokenPositions.computeIfAbsent(breakerId, ignored -> new HashSet<>())
+                    .add(new SpleefAchievementRules.BlockPosition(block.getX(), block.getZ()));
             int matchBlocks = session.spleefBlocksBroken.merge(breakerId, 1, Integer::sum);
             if (ArcadeTestPlayerManager.shouldPersistProgression(breakerId, testPlayers.isTestPlayer(breakerId))) {
                 String progressPath = localStatsPath(breakerId, "spleef") + "blocks-broken";
-                if (plugin.getConfig().getInt(progressPath, 0) + matchBlocks
-                        >= SpleefAchievementRules.DEMOLITIONIST_BLOCKS) {
-                    awardCatalogAchievement(breaker, "spleef", "demolitionist");
-                }
             }
             if (session.alive.size() == 2
                     && "brawler".equals(session.spleefKits.getOrDefault(breakerId, "snowballer"))
@@ -29154,6 +29225,18 @@ public final class ArcadePortManager implements Listener {
                 && event.getEntity() instanceof Player victim
                 && session.players.containsKey(victim.getUniqueId())) {
             Player attacker = playerShooter(byEntity.getDamager());
+            if (session.type == ArcadePortGame.TURF_WARS) {
+                UUID victimId = victim.getUniqueId();
+                UUID bounceShooter = byEntity.getDamager() instanceof Arrow arrow
+                        ? session.turfBounceArrowOwners.get(arrow.getUniqueId()) : null;
+                if (attacker != null && attacker.getUniqueId().equals(bounceShooter)) {
+                    session.turfBounceHitByTarget.put(victimId, bounceShooter);
+                    session.turfBounceHitAt.put(victimId, System.currentTimeMillis());
+                } else {
+                    session.turfBounceHitByTarget.remove(victimId);
+                    session.turfBounceHitAt.remove(victimId);
+                }
+            }
             if (attacker != null && !attacker.equals(victim)
                     && session.players.containsKey(attacker.getUniqueId())) {
                 session.lastHitModeByVictim.put(victim.getUniqueId(),
@@ -30330,12 +30413,16 @@ public final class ArcadePortManager implements Listener {
                 UUID bounceOwner = session.turfBounceArrowOwners.remove(turfArrow.getUniqueId());
                 boolean bounceShot = bounceOwner != null && bounceOwner.equals(shooter.getUniqueId());
                 if (bounceShot) {
+                    session.turfBounceHitByTarget.put(target.getUniqueId(), shooter.getUniqueId());
+                    session.turfBounceHitAt.put(target.getUniqueId(), System.currentTimeMillis());
                     int streak = session.turfBounceShotStreak.merge(shooter.getUniqueId(), 1, Integer::sum);
                     if (streak >= 3) awardCatalogAchievement(shooter, "turf-wars", "triple-combo");
                     if (session.turf360BounceArrows.remove(turfArrow.getUniqueId())) {
                         awardCatalogAchievement(shooter, "turf-wars", "360-no-scope");
                     }
                 } else {
+                    session.turfBounceHitByTarget.remove(target.getUniqueId());
+                    session.turfBounceHitAt.remove(target.getUniqueId());
                     session.turfBounceShotStreak.remove(shooter.getUniqueId());
                     session.turf360BounceArrows.remove(turfArrow.getUniqueId());
                 }
@@ -35717,6 +35804,10 @@ public final class ArcadePortManager implements Listener {
                     recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis(), bombId,
                             ArcadePortRules.bombLobbersKillMode(false));
                     if (target.getHealth() <= blastDamage) {
+                        if (owner != null && owner.isOnline() && session.alive.size() == 2
+                                && BombLobbersAchievement.closeShave(true, owner.getHealth(), target.getHealth())) {
+                            session.bombCloseShaveCandidates.add(ownerId);
+                        }
                         if (bombLobbersBlast && owner != null && owner.isOnline()
                                 && session.players.containsKey(ownerId) && !target.getUniqueId().equals(ownerId)) {
                             if (closeRangeKillTargets.contains(target.getUniqueId())) {

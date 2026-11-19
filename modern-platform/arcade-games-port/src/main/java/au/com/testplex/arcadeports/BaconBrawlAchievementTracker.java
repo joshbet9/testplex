@@ -25,6 +25,22 @@ final class BaconBrawlAchievementTracker {
     private final Map<HitPair, Long> lastGuardHitAt = new HashMap<>();
     private final Map<UUID, Set<UUID>> ignitedOpponents = new HashMap<>();
     private final Map<UUID, KnockoutStreak> knockoutStreaks = new HashMap<>();
+    private final Map<UUID, Integer> creditedKills = new HashMap<>();
+    private final Map<UUID, Integer> criticalKills = new HashMap<>();
+    private final Set<UUID> nonCriticalKillers = new HashSet<>();
+
+    void recordCreditedKill(UUID killerId, boolean critical) {
+        if (killerId == null) return;
+        creditedKills.merge(killerId, 1, Integer::sum);
+        if (critical) criticalKills.merge(killerId, 1, Integer::sum);
+        else nonCriticalKillers.add(killerId);
+    }
+
+    boolean qualifiesWellDone(UUID playerId) {
+        int kills = creditedKills.getOrDefault(playerId, 0);
+        return playerId != null && kills >= 3 && criticalKills.getOrDefault(playerId, 0) == kills
+                && !nonCriticalKillers.contains(playerId);
+    }
 
     int recordBlockedHit(UUID brutusId, UUID attackerId, long now) {
         if (brutusId == null || attackerId == null || brutusId.equals(attackerId)) return 0;
@@ -68,5 +84,8 @@ final class BaconBrawlAchievementTracker {
         lastGuardHitAt.clear();
         ignitedOpponents.clear();
         knockoutStreaks.clear();
+        creditedKills.clear();
+        criticalKills.clear();
+        nonCriticalKillers.clear();
     }
 }

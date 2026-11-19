@@ -10,6 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class GladiatorsAchievementRulesTest {
     @Test
+    void poisonedPatienceRequiresThreeCreditedArenaPoisonEliminations() {
+        assertFalse(GladiatorsAchievementRules.poisonedPatience(2));
+        assertTrue(GladiatorsAchievementRules.poisonedPatience(3));
+        assertTrue(GladiatorsAchievementRules.poisonedPatience(5));
+    }
+
+    @Test
     void fullArsenalRequiresEveryCombatToolAndACompletedTournamentPath() {
         int hits = GladiatorsAchievementRules.addHit(0, GladiatorsAchievementRules.SWORD_HIT);
         hits = GladiatorsAchievementRules.addHit(hits, GladiatorsAchievementRules.BOW_HIT);

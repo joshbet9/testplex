@@ -1483,20 +1483,14 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
     }
 
-    @Test void kingOfBaconAchievementUsesUpdatedFifteenWinThreshold() {
-        assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
-        assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
-        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
-        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(16));
-    }
-
     @Test void baconBrawlStatsMenuHasEveryExpectedAchievementBottle() {
         assertEquals(java.util.List.of("king-of-bacon", "pigs-in-blankets", "flash-fried",
                         "raw-pork", "three-for-one"),
                 java.util.Arrays.stream(BaconBrawlAchievement.values())
                         .map(BaconBrawlAchievement::slug).toList());
-        assertEquals("King of Bacon", BaconBrawlAchievement.KING_OF_BACON.displayName());
-        assertEquals("Win 15 games of Bacon Brawl.", BaconBrawlAchievement.KING_OF_BACON.requirement());
+        assertEquals("Well Done", BaconBrawlAchievement.WELL_DONE.displayName());
+        assertEquals("Win Bacon Brawl with at least 3 credited kills, and have every credited kill be a critical hit.",
+                BaconBrawlAchievement.WELL_DONE.requirement());
     }
 
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {
@@ -2771,8 +2765,6 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true, true));
         assertFalse(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, false, false));
         assertTrue(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true, false));
-        assertFalse(ArcadePortRules.shouldAwardBombLobbersMasterBomber(29));
-        assertTrue(ArcadePortRules.shouldAwardBombLobbersMasterBomber(30));
         assertEquals("test-achievements.bomb-lobbers.00000000-0000-0000-0000-000000000001.ultimate-killer",
                 ArcadePortRules.bombLobbersAchievementConfigKey(
                         java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"), "ultimate-killer"));

@@ -32,9 +32,11 @@ class WizardsAchievementRulesTest {
         assertFalse(WizardsAchievementRules.singleFamilyVictory(true, 2));
     }
 
-    @Test void supremeWizardUsesFifteenLifetimeWins() {
-        assertFalse(WizardsAchievementRules.supremeWizard(14));
-        assertTrue(WizardsAchievementRules.supremeWizard(15));
+    @Test void manaReversalRequiresTheSurvivalAndSpellEliminationInAWin() {
+        assertTrue(WizardsAchievementRules.manaReversal(true, true, true));
+        assertFalse(WizardsAchievementRules.manaReversal(false, true, true));
+        assertFalse(WizardsAchievementRules.manaReversal(true, false, true));
+        assertFalse(WizardsAchievementRules.manaReversal(true, true, false));
     }
 
     @Test void kitAchievementsRequireTheKitAndTheWinningConditions() {

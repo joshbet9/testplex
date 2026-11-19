@@ -9,10 +9,10 @@ import java.util.Locale;
 public final class SkyWarsAchievementRules {
     private SkyWarsAchievementRules() {}
 
-    public static final int SKY_KING_WINS = 20;
+    public static final double LAST_HEART_MAX_HEALTH = 2.0D;
     public static final int TNT_HOARDER_PICKUPS = 100;
     public static final int LEFT_FOR_DEAD_ZOMBIES = 120;
-    public static final int COLD_BLOODED_KILLS = 80;
+    public static final double GRAVITY_ACCOUNTANT_FALL_BLOCKS = 40.0D;
     public static final double SECOND_CHANCE_FALL_BLOCKS = 20.0D;
     public static final int FIRE_SALE_VICTIMS = 2;
     public static final double BRIDGE_THE_GAP_BLOCKS = 16.0D;
@@ -24,6 +24,14 @@ public final class SkyWarsAchievementRules {
 
     public static boolean reached(int progress, int requirement) {
         return requirement > 0 && progress >= requirement;
+    }
+
+    public static boolean lastHeartInTheSky(boolean finalDuel, double health) {
+        return finalDuel && Double.isFinite(health) && health <= LAST_HEART_MAX_HEALTH;
+    }
+
+    public static boolean gravityAccountantFall(double fallDistance) {
+        return Double.isFinite(fallDistance) && fallDistance >= GRAVITY_ACCOUNTANT_FALL_BLOCKS;
     }
 
     public static boolean secondChance(double startingIslandY, double currentY, boolean falling) {
@@ -57,6 +65,8 @@ public final class SkyWarsAchievementRules {
         private final Set<UUID> dirtVoidVictims = new HashSet<>();
         private final Set<UUID> tntVictims = new HashSet<>();
         private final Set<UUID> highGroundVictims = new HashSet<>();
+        private boolean lastHeartInTheSky;
+        private boolean gravityAccountant;
         private boolean secondChance;
         private boolean bridgeCrossed;
         private boolean magnetVoidElimination;
@@ -82,6 +92,14 @@ public final class SkyWarsAchievementRules {
                     && reached(highGroundVictims.size(), HIGH_GROUND_KILLS);
         }
 
+        public void recordLastHeartInTheSky(boolean finalDuel, double health) {
+            lastHeartInTheSky |= SkyWarsAchievementRules.lastHeartInTheSky(finalDuel, health);
+        }
+
+        public void recordGravityAccountantElimination(double fallDistance) {
+            gravityAccountant |= SkyWarsAchievementRules.gravityAccountantFall(fallDistance);
+        }
+
         public void recordSecondChance(boolean qualifies) { secondChance |= qualifies; }
         public void recordBridgeCrossing(boolean qualifies) { bridgeCrossed |= qualifies; }
         public void recordMagnetVoidElimination(boolean qualifies) { magnetVoidElimination |= qualifies; }
@@ -89,6 +107,8 @@ public final class SkyWarsAchievementRules {
         public boolean secondChance() { return secondChance; }
         public boolean bridgeCrossed() { return bridgeCrossed; }
         public boolean magnetVoidElimination() { return magnetVoidElimination; }
+        public boolean lastHeartInTheSky() { return lastHeartInTheSky; }
+        public boolean gravityAccountant() { return gravityAccountant; }
         public int fireBurstVictims() { return fireBurstVictims.size(); }
         public int dirtVoidVictims() { return dirtVoidVictims.size(); }
         public int tntVictims() { return tntVictims.size(); }
