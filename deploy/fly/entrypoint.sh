@@ -129,4 +129,4 @@ TESTPLEX_WORLD_OWNER=minecraft:minecraft \
     /opt/testplex/MonsterMazeMaps "$DATA_ROOT"
 
 cd "$DATA_ROOT"
-exec gosu minecraft java -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui
+exec gosu minecraft java -Dtestplex.monster-maze-source-root=/opt/testplex/MonsterMazeMaps -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui

@@ -348,10 +348,14 @@ jobs:
           sh -n deploy/fly/verify-runtime.sh
           fixture_root="$(mktemp -d)"
           trap 'rm -rf "$fixture_root"' EXIT
-          mkdir -p "$fixture_root/opt/testplex" "$fixture_root/server/update/maps/Wizards" "$fixture_root/server/update/maps/Nano Wizards" "$fixture_root/server/logs"
+          mkdir -p "$fixture_root/opt/testplex/MonsterMazeMaps" "$fixture_root/server/update/maps/Wizards" "$fixture_root/server/update/maps/Nano Wizards" "$fixture_root/server/logs"
           for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-            ln -s "/source/$world" "$fixture_root/server/$world"
+            mkdir -p "$fixture_root/opt/testplex/MonsterMazeMaps/$world/region"
+            printf 'source world\n' > "$fixture_root/opt/testplex/MonsterMazeMaps/$world/level.dat"
+            printf 'region\n' > "$fixture_root/opt/testplex/MonsterMazeMaps/$world/region/r.0.0.mca"
+            ln -s "$fixture_root/opt/testplex/MonsterMazeMaps/$world" "$fixture_root/server/$world"
           done
+          printf '%s\n' '0123456789abcdef0123456789abcdef01234567' > "$fixture_root/opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps"
           printf '%s\n' '0123456789abcdef0123456789abcdef01234567' > "$fixture_root/opt/testplex/source-build.txt"
           printf '%s\n' '[ArcadeMechanicsModern] TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published' > "$fixture_root/server/logs/latest.log"
           output="$(TESTPLEX_VERIFY_ROOT="$fixture_root" sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567')"
@@ -360,6 +364,14 @@ jobs:
             echo 'Fly runtime verifier accepted a mismatched source SHA.' >&2
             exit 1
           fi
+          rm "$fixture_root/server/mm_void"
+          ln -s '/source/mm_void' "$fixture_root/server/mm_void"
+          if TESTPLEX_VERIFY_ROOT="$fixture_root" sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567'; then
+            echo 'Fly runtime verifier accepted a Monster Maze world link outside packaged map assets.' >&2
+            exit 1
+          fi
+          rm "$fixture_root/server/mm_void"
+          ln -s "$fixture_root/opt/testplex/MonsterMazeMaps/mm_void" "$fixture_root/server/mm_void"
           : > "$fixture_root/server/logs/latest.log"
           if TESTPLEX_VERIFY_ROOT="$fixture_root" TESTPLEX_VERIFY_BOOTSTRAP_ATTEMPTS=1 sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567'; then
             echo 'Fly runtime verifier accepted a missing Arcade bootstrap marker.' >&2
@@ -376,6 +388,7 @@ jobs:
           bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           grep -Fq 'FPP_VERSION="2.1.7"' "$deploy_workflow"
           grep -Fq 'versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar' "$deploy_workflow"
+          grep -Fq -- '-Dtestplex.monster-maze-source-root=/opt/testplex/MonsterMazeMaps' deploy/fly/entrypoint.sh
           git diff --check
 
       - name: Upload modern plugin artifact
