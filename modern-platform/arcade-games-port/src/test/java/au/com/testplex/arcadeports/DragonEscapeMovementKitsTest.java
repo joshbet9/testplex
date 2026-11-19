@@ -134,7 +134,7 @@ class DragonEscapeMovementKitsTest {
 
     @Test
     void dragonEscapeVisibilityAndGhostControlsUseSeparateHotbarSlots() {
-        assertEquals(7, DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT);
+        assertEquals(4, DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT);
         assertEquals(8, DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);
         assertNotEquals(DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT,
                 DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);
