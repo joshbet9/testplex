@@ -1316,7 +1316,8 @@ public final class ArcadePortRules {
                 || nowMillis - launchedAtMillis > 7_000L || reason == null) return false;
         String normalized = reason.toLowerCase(java.util.Locale.ROOT);
         return normalized.contains("fall") || normalized.contains("fell") || normalized.contains("void")
-                || normalized.contains("water") || normalized.contains("lava")
+                || normalized.contains("water") || normalized.contains("drown") || normalized.contains("lava")
+                || normalized.contains("burn") || normalized.contains("suffocat")
                 || normalized.contains("dragon") || normalized.contains("caught");
     }
 

@@ -22,8 +22,9 @@ final class SourceDeathMessageRules {
 
     static String dragonEscapeDisruptorCause(String reason) {
         String normalized = normalize(reason);
-        if (normalized.contains("water")) return "was lost to the water!";
+        if (normalized.contains("water") || normalized.contains("drown")) return "was lost to the water!";
         if (normalized.contains("lava")) return "was burned by lava!";
+        if (normalized.contains("burn")) return "burned to death!";
         return dragonEscapeCause(reason);
     }
 

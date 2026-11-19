@@ -75,6 +75,8 @@ class ArcadeProgressCatalogTest {
         assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
                 owner, victim, "was caught by Douglas the Dragon"));
         assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "burned to death"));
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
                 owner, victim, "fell from the course into lava"));
         assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_001L, 8_000L,
                 owner, victim, "fell into the void"));
