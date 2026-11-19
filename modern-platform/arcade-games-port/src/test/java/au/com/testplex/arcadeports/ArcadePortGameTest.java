@@ -2036,6 +2036,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(0));
     }
 
+    @Test void dragonEscapeKitPlacementIgnoresPlacerButStillProtectsOtherRacers() {
+        java.util.UUID placer = java.util.UUID.randomUUID();
+        java.util.UUID otherRacer = java.util.UUID.randomUUID();
+        assertFalse(ArcadePortRules.shouldBlockDragonEscapeKitPlacementOccupant(placer, placer));
+        assertTrue(ArcadePortRules.shouldBlockDragonEscapeKitPlacementOccupant(placer, otherRacer));
+        assertTrue(ArcadePortRules.shouldBlockDragonEscapeKitPlacementOccupant(null, otherRacer),
+                "unknown placement ownership must keep the safety check enabled");
+    }
+
     @Test void dragonEscapeBuilderPlacementRoutesFromKitAndActionNotEventItemPrediction() {
         assertTrue(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, true, true, true));
         assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, false, true, true));
