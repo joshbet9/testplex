@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test safe JAR delta creation and application
-        run: python3 -m unittest scripts.test_testplex_jar_delta
+        run: python3 -m unittest scripts.test_testplex_jar_delta scripts.test_testplex_map_archive
 
       - name: Set up Java 25
         uses: actions/setup-java@v4
