@@ -1308,6 +1308,19 @@ public final class ArcadePortRules {
                 && nowMillis - launchedAtMillis <= 7_000L;
     }
 
+    /** Credits a Disruptor launch when its environmental knockback causes a timely elimination. */
+    public static boolean shouldCreditDragonEscapeDisruptor(long nowMillis, long launchedAtMillis,
+            UUID ownerId, UUID victimId, String reason) {
+        if (ownerId == null || victimId == null || ownerId.equals(victimId)
+                || launchedAtMillis <= 0L || nowMillis < launchedAtMillis
+                || nowMillis - launchedAtMillis > 7_000L || reason == null) return false;
+        String normalized = reason.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("fall") || normalized.contains("fell") || normalized.contains("void")
+                || normalized.contains("water") || normalized.contains("drown") || normalized.contains("lava")
+                || normalized.contains("burn") || normalized.contains("suffocat")
+                || normalized.contains("dragon") || normalized.contains("caught");
+    }
+
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
         long lockout = Math.max(0L, GameDebugRuntimeOverrides.longValue(
                 "DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS", DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS));

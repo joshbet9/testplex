@@ -67,6 +67,30 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
+    void disruptorCreditsEnvironmentalEliminationsOnlyToTheRecentNonVictimOwner() {
+        UUID owner = UUID.randomUUID();
+        UUID victim = UUID.randomUUID();
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "was lost to the water"));
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "was caught by Douglas the Dragon"));
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "burned to death"));
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "fell from the course into lava"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_001L, 8_000L,
+                owner, victim, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(14_999L, 15_000L,
+                owner, victim, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                owner, victim, "was killed by a player"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                victim, victim, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeDisruptor(15_000L, 8_000L,
+                null, victim, "fell into the void"));
+    }
+
+    @Test
     void deathTagHasFourteenReviewedAchievementsAndNoCircularKitUnlocks() {
         var achievements = ArcadeProgressCatalog.achievements("death-tag");
         assertEquals(14, achievements.size());
