@@ -39,6 +39,20 @@ class ArcadeStatsLayoutTest {
     }
 
     @Test
+    void milestoneTiersAreArrangedFromBottomToTopWithoutTouchingTheFooter() {
+        assertEquals(4, ArcadeStatsLayout.milestoneTierSlot(0, 4) / 9);
+        assertEquals(3, ArcadeStatsLayout.milestoneTierSlot(1, 4) / 9);
+        assertEquals(2, ArcadeStatsLayout.milestoneTierSlot(2, 4) / 9);
+        assertEquals(1, ArcadeStatsLayout.milestoneTierSlot(3, 4) / 9);
+        assertEquals(40, ArcadeStatsLayout.milestoneTierSlot(0, 4));
+        assertEquals(13, ArcadeStatsLayout.milestoneTierSlot(3, 4));
+        assertThrows(IllegalArgumentException.class,
+                () -> ArcadeStatsLayout.milestoneTierSlot(4, 4));
+        assertThrows(IllegalArgumentException.class,
+                () -> ArcadeStatsLayout.milestoneTierSlot(0, 9));
+    }
+
+    @Test
     void footerAndPageBoundariesRemainAccessible() {
         assertEquals(List.of(49), ArcadeStatsLayout.footerSlots(1));
         assertEquals(List.of(48, 50), ArcadeStatsLayout.footerSlots(2));

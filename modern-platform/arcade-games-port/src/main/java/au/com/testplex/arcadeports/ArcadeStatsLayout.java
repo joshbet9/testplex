@@ -67,6 +67,15 @@ final class ArcadeStatsLayout {
         };
     }
 
+    /** Milestone tiers progress visually from the bottom row upward. */
+    static int milestoneTierSlot(int stageOffset, int column) {
+        if (stageOffset < 0 || stageOffset >= STAGES_PER_PAGE)
+            throw new IllegalArgumentException("Expected milestone tier offset 0-" + (STAGES_PER_PAGE - 1));
+        if (column < 0 || column > 8)
+            throw new IllegalArgumentException("Expected inventory column 0-8");
+        return (STAGES_PER_PAGE - stageOffset) * 9 + column;
+    }
+
     /** Footer controls have a deliberate centre gap for two items, matching the Mineplex menus. */
     static List<Integer> footerSlots(int count) {
         if (count < 0 || count > 3) throw new IllegalArgumentException("Expected 0-3 footer items");
