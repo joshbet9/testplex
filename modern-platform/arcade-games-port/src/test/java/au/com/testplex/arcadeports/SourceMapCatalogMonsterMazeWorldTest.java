@@ -9,6 +9,8 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class SourceMapCatalogMonsterMazeWorldTest {
     private static final String SOURCE_REVISION = "0123456789abcdef0123456789abcdef01234567";
@@ -58,6 +60,48 @@ class SourceMapCatalogMonsterMazeWorldTest {
 
         assertEquals(source.toRealPath(),
                 SourceMapCatalog.resolveMonsterMazeWorldSource(container, "mm_siberian", null));
+    }
+
+    @Test
+    void flyPreparesWritableRuntimeCopyAndLeavesPackagedAssetsUntouched(@TempDir Path temp) throws IOException {
+        Path container = Files.createDirectories(temp.resolve("server"));
+        Path assetRoot = Files.createDirectories(temp.resolve("image/MonsterMazeMaps"));
+        Path runtimeRoot = Files.createDirectories(temp.resolve("runtime/MonsterMazeMaps"));
+        Path packagedWorld = createWorld(assetRoot, "mm_void");
+        Files.writeString(assetRoot.resolve(".testplex-mm-source-maps"), SOURCE_REVISION);
+        Files.createSymbolicLink(container.resolve("mm_void"), packagedWorld);
+
+        Path runtimeWorld = SourceMapCatalog.prepareMonsterMazeRuntimeWorld(
+                container, "mm_void", packagedWorld, assetRoot, runtimeRoot);
+
+        assertEquals(runtimeRoot.resolve("mm_void").toRealPath(), runtimeWorld);
+        assertEquals(runtimeWorld, SourceMapCatalog.resolveMonsterMazeRuntimeWorld(
+                container, "mm_void", assetRoot, runtimeRoot));
+        assertTrue(Files.isRegularFile(packagedWorld.resolve("region/r.0.0.mca")));
+        assertFalse(Files.exists(packagedWorld.resolve("dimensions/minecraft/overworld/region")));
+        assertFalse(Files.exists(runtimeWorld.resolve("region")));
+        assertTrue(Files.isRegularFile(runtimeWorld.resolve("dimensions/minecraft/overworld/region/r.0.0.mca")));
+        assertEquals(runtimeWorld, container.resolve("mm_void").toRealPath());
+    }
+
+    @Test
+    void repeatedFlyPreparationReusesRuntimeCopyAndKeepsOriginalLinkSafe(@TempDir Path temp) throws IOException {
+        Path container = Files.createDirectories(temp.resolve("server"));
+        Path assetRoot = Files.createDirectories(temp.resolve("image/MonsterMazeMaps"));
+        Path runtimeRoot = Files.createDirectories(temp.resolve("runtime/MonsterMazeMaps"));
+        Path packagedWorld = createWorld(assetRoot, "mm_void");
+        Files.writeString(assetRoot.resolve(".testplex-mm-source-maps"), SOURCE_REVISION);
+        Files.createSymbolicLink(container.resolve("mm_void"), packagedWorld);
+
+        Path first = SourceMapCatalog.prepareMonsterMazeRuntimeWorld(
+                container, "mm_void", packagedWorld, assetRoot, runtimeRoot);
+        Path second = SourceMapCatalog.prepareMonsterMazeRuntimeWorld(
+                container, "mm_void", packagedWorld, assetRoot, runtimeRoot);
+
+        assertEquals(first, second);
+        assertTrue(Files.isRegularFile(packagedWorld.resolve("region/r.0.0.mca")));
+        assertFalse(Files.exists(packagedWorld.resolve("dimensions/minecraft/overworld/region")));
+        assertEquals(second, container.resolve("mm_void").toRealPath());
     }
 
     private static Path createWorld(Path root, String name) throws IOException {

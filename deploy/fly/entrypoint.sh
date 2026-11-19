@@ -124,9 +124,9 @@ chown -R minecraft:minecraft "$DATA_ROOT/update/maps/Wizards" "$DATA_ROOT/update
 # Keep the persistent Paper world container so vanilla player data and plugin
 # data remain on the Fly volume. Only the seven source-map entries are symlinked
 # to image assets, keeping their large region data outside the volume.
-TESTPLEX_WORLD_OWNER=minecraft:minecraft \
+TESTPLEX_WORLD_OWNER=minecraft:minecraft TESTPLEX_MM_RUNTIME_ROOT=/tmp/testplex-monster-maze-runtime \
     /usr/local/bin/provision-monster-maze-worlds \
     /opt/testplex/MonsterMazeMaps "$DATA_ROOT"
 
 cd "$DATA_ROOT"
-exec gosu minecraft java -Dtestplex.monster-maze-source-root=/opt/testplex/MonsterMazeMaps -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui
+exec gosu minecraft java -Dtestplex.monster-maze-source-root=/opt/testplex/MonsterMazeMaps -Dtestplex.monster-maze-runtime-root=/tmp/testplex-monster-maze-runtime -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui

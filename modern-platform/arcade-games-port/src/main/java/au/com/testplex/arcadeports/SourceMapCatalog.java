@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -31,6 +33,10 @@ public final class SourceMapCatalog {
             "source-maps/Heroes of GWEN/HOG_Heros_Valley.zip";
     private static final String HEROES_OF_GWEN_INFERRED_OLD_DEFAULT =
             "source-maps/Heroes of GWEN/HOG_Heroes Valley.zip";
+    private static final Object MONSTER_MAZE_WORLD_PREPARATION_LOCK = new Object();
+    private static final String MONSTER_MAZE_RUNTIME_REVISION_FILE = ".testplex-mm-source-revision";
+    private static final String MONSTER_MAZE_RUNTIME_ROOT_REVISION_FILE = ".testplex-mm-runtime-revision";
+
     private static final java.util.Set<String> MONSTER_MAZE_WORLD_NAMES = java.util.Set.of(
             "mm_void", "mm_volcano", "mm_colombia", "mm_sandycoast", "mm_siberian",
             "mm_swampland", "mm_tesorohundido");
@@ -603,23 +609,48 @@ public final class SourceMapCatalog {
 
     /**
      * Prepare one of the deployed Monster Maze source worlds for Paper 26.3.
-     * A deployment can restore the original {@code mm_*} folder while Paper's
-     * previous import still exists under {@code world/dimensions/minecraft}.
-     * When the restored source contains complete terrain, discard only that
-     * exact imported copy and let Paper import the authoritative source again.
+     * Fly's world entries point at immutable image assets. Normalize a private
+     * per-machine copy instead of moving region directories inside that image
+     * layer; the copy lives under java.io.tmpdir, outside the persistent data
+     * volume, and is reused for the lifetime of the machine.
      */
     public static boolean prepareMonsterMazeWorld(JavaPlugin plugin, String worldName) {
+        synchronized (MONSTER_MAZE_WORLD_PREPARATION_LOCK) {
+            return prepareMonsterMazeWorldLocked(plugin, worldName);
+        }
+    }
+
+    private static boolean prepareMonsterMazeWorldLocked(JavaPlugin plugin, String worldName) {
         if (plugin == null || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) return false;
 
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         String configuredAssets = System.getProperty("testplex.monster-maze-source-root");
         Path assetsRoot = configuredAssets == null || configuredAssets.isBlank()
                 ? null : Path.of(configuredAssets);
+        String configuredRuntime = System.getProperty("testplex.monster-maze-runtime-root");
+        Path runtimeRoot = configuredRuntime == null || configuredRuntime.isBlank()
+                ? Path.of(System.getProperty("java.io.tmpdir"), "testplex-monster-maze-runtime")
+                : Path.of(configuredRuntime);
+
         Path source = resolveMonsterMazeWorldSource(container, worldName, assetsRoot);
+        boolean packagedFlyWorld = source != null && assetsRoot != null
+                && Files.isSymbolicLink(container.resolve(worldName));
+        if (source == null) source = resolveMonsterMazeRuntimeWorld(container, worldName, assetsRoot, runtimeRoot);
         if (source == null) {
             plugin.getLogger().warning("Monster Maze source world is missing or unsafe: "
                     + container.resolve(worldName).normalize());
             return false;
+        }
+
+        if (packagedFlyWorld) {
+            try {
+                source = prepareMonsterMazeRuntimeWorld(container, worldName, source, assetsRoot, runtimeRoot);
+            } catch (IOException exception) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Could not stage writable Monster Maze map " + worldName + " from packaged assets: "
+                                + exception.getMessage(), exception);
+                return false;
+            }
         }
 
         boolean hasLegacyTerrain = hasWorldDownloaderTerrainMetadata(source);
@@ -660,6 +691,209 @@ public final class SourceMapCatalog {
                     "Could not prepare Monster Maze source world " + worldName + " for Paper 26.3: "
                             + exception.getMessage(), exception);
             return false;
+        }
+    }
+
+    /** Validates and reuses the private runtime copy after Paper unloads a map. */
+    static Path resolveMonsterMazeRuntimeWorld(Path container, String worldName, Path assetsRoot, Path runtimeRoot) {
+        if (container == null || assetsRoot == null || runtimeRoot == null
+                || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) return null;
+        Path entry = container.toAbsolutePath().normalize().resolve(worldName);
+        if (!Files.isSymbolicLink(entry) || Files.isSymbolicLink(runtimeRoot)) return null;
+        try {
+            Path realContainer = container.toAbsolutePath().normalize().toRealPath();
+            Path realAssets = assetsRoot.toAbsolutePath().normalize().toRealPath();
+            Path realRuntime = runtimeRoot.toAbsolutePath().normalize().toRealPath();
+            if (pathsOverlap(realRuntime, realContainer) || pathsOverlap(realRuntime, realAssets)) return null;
+            Path source = entry.toRealPath();
+            if (!realRuntime.equals(source.getParent()) || !worldName.equals(source.getFileName().toString())) return null;
+            String expectedRevision = readMonsterMazeRevision(realAssets);
+            Path runtimeMarker = realRuntime.resolve(MONSTER_MAZE_RUNTIME_ROOT_REVISION_FILE);
+            if (expectedRevision == null || Files.isSymbolicLink(runtimeMarker)
+                    || !Files.isRegularFile(runtimeMarker, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || !expectedRevision.equals(Files.readString(runtimeMarker, StandardCharsets.UTF_8).trim())
+                    || !Files.isRegularFile(source.resolve(MONSTER_MAZE_RUNTIME_REVISION_FILE),
+                            java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || !expectedRevision.equals(Files.readString(source.resolve(MONSTER_MAZE_RUNTIME_REVISION_FILE),
+                            StandardCharsets.UTF_8).trim())) return null;
+            if (!Files.isDirectory(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(source.resolve("level.dat"))
+                    || !Files.isRegularFile(source.resolve("level.dat"), java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+            // Paper may already have imported all terrain into its server world
+            // folder. The caller decides whether that import is safe to reuse.
+            return source;
+        } catch (IOException | SecurityException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * Copies a validated image world to ephemeral writable storage and redirects
+     * only its already-validated Fly symlink. Never modifies image assets or the
+     * persistent player-data volume.
+     */
+    static Path prepareMonsterMazeRuntimeWorld(Path container, String worldName, Path packagedSource,
+            Path assetsRoot, Path runtimeRoot) throws IOException {
+        if (container == null || packagedSource == null || assetsRoot == null || runtimeRoot == null
+                || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) {
+            throw new IOException("Invalid Monster Maze runtime-copy arguments.");
+        }
+        Path realContainer = container.toAbsolutePath().normalize().toRealPath();
+        Path realAssets = assetsRoot.toAbsolutePath().normalize().toRealPath();
+        Path source = packagedSource.toAbsolutePath().normalize().toRealPath();
+        if (!Files.isDirectory(realAssets, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                || !realAssets.equals(source.getParent()) || !worldName.equals(source.getFileName().toString())) {
+            throw new IOException("Packaged Monster Maze source is outside its configured asset root.");
+        }
+        String revision = readMonsterMazeRevision(realAssets);
+        if (revision == null) throw new IOException("Packaged Monster Maze revision marker is missing or invalid.");
+
+        Path runtimeInput = runtimeRoot.toAbsolutePath().normalize();
+        if (Files.exists(runtimeInput, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                && Files.isSymbolicLink(runtimeInput)) {
+            throw new IOException("Monster Maze runtime root must not be a symbolic link.");
+        }
+        Files.createDirectories(runtimeInput);
+        Path realRuntime = runtimeInput.toRealPath();
+        if (!Files.isDirectory(realRuntime, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                || pathsOverlap(realRuntime, realContainer) || pathsOverlap(realRuntime, realAssets)) {
+            throw new IOException("Monster Maze runtime root must be separate from map assets and server data.");
+        }
+
+        Path revisionMarker = realRuntime.resolve(MONSTER_MAZE_RUNTIME_ROOT_REVISION_FILE);
+        if (Files.exists(revisionMarker, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                && (Files.isSymbolicLink(revisionMarker)
+                        || !Files.isRegularFile(revisionMarker, java.nio.file.LinkOption.NOFOLLOW_LINKS))) {
+            throw new IOException("Monster Maze runtime revision marker is unsafe.");
+        }
+        Files.writeString(revisionMarker, revision, StandardCharsets.UTF_8);
+
+        Path target = realRuntime.resolve(worldName).normalize();
+        if (!target.startsWith(realRuntime) || target.equals(realRuntime) || Files.isSymbolicLink(target)) {
+            throw new IOException("Monster Maze runtime target is unsafe: " + target);
+        }
+        Path entry = realContainer.resolve(worldName).normalize();
+        if (!entry.startsWith(realContainer) || !Files.isSymbolicLink(entry)) {
+            throw new IOException("Expected a provisioned Monster Maze world symlink: " + entry);
+        }
+        Path currentTarget = entry.toRealPath();
+        if (!currentTarget.equals(source) && !currentTarget.equals(target)) {
+            throw new IOException("Refusing to replace an unexpected Monster Maze world link: " + entry);
+        }
+
+        boolean reusable = Files.isDirectory(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                && Files.isRegularFile(target.resolve(MONSTER_MAZE_RUNTIME_REVISION_FILE),
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        if (reusable) {
+            reusable = revision.equals(Files.readString(target.resolve(MONSTER_MAZE_RUNTIME_REVISION_FILE),
+                    StandardCharsets.UTF_8).trim());
+            if (reusable) {
+                try {
+                    preparePaper26WorldStorage(target);
+                } catch (IOException incompleteCopy) {
+                    reusable = false;
+                }
+            }
+        }
+        if (!reusable && Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            deleteMonsterMazeRuntimeWorld(target, realRuntime, worldName);
+        }
+
+        if (!reusable) {
+            Path staging = Files.createTempDirectory(realRuntime, "." + worldName + ".installing-");
+            Path stagedWorld = staging.resolve(worldName);
+            try {
+                copyMonsterMazeWorldTree(source, stagedWorld);
+                Files.writeString(stagedWorld.resolve(MONSTER_MAZE_RUNTIME_REVISION_FILE),
+                        revision, StandardCharsets.UTF_8);
+                preparePaper26WorldStorage(stagedWorld);
+                Files.move(stagedWorld, target);
+            } finally {
+                if (Files.exists(staging, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    deleteMonsterMazeRuntimeStaging(staging, realRuntime);
+                }
+            }
+        }
+
+        if (!hasWorldDownloaderTerrainMetadata(target) && !hasPaper26TerrainMetadata(target)) {
+            throw new IOException("Writable Monster Maze runtime copy has no valid terrain: " + target);
+        }
+        if (!currentTarget.equals(target)) {
+            Files.delete(entry);
+            try {
+                Files.createSymbolicLink(entry, target);
+            } catch (IOException | UnsupportedOperationException exception) {
+                Files.createSymbolicLink(entry, source);
+                throw new IOException("Could not redirect Monster Maze world to writable runtime storage.", exception);
+            }
+        }
+        return target;
+    }
+
+    private static String readMonsterMazeRevision(Path assetRoot) {
+        if (assetRoot == null) return null;
+        Path marker = assetRoot.resolve(".testplex-mm-source-maps");
+        try {
+            if (Files.isSymbolicLink(marker)
+                    || !Files.isRegularFile(marker, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+            String revision = Files.readString(marker, StandardCharsets.UTF_8).trim();
+            return revision.matches("[0-9a-f]{40}") ? revision : null;
+        } catch (IOException | SecurityException exception) {
+            return null;
+        }
+    }
+
+    private static boolean pathsOverlap(Path left, Path right) {
+        return left.startsWith(right) || right.startsWith(left);
+    }
+
+    private static void copyMonsterMazeWorldTree(Path source, Path destination) throws IOException {
+        try (Stream<Path> paths = Files.walk(source)) {
+            for (Path input : paths.sorted(Comparator.comparingInt(Path::getNameCount)).toList()) {
+                if (Files.isSymbolicLink(input)) {
+                    throw new IOException("Refusing a symbolic link inside Monster Maze map assets: " + input);
+                }
+                Path output = destination.resolve(source.relativize(input)).normalize();
+                if (!output.startsWith(destination)) throw new IOException("Monster Maze copy escaped staging.");
+                if (Files.isDirectory(input, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    Files.createDirectories(output);
+                } else if (Files.isRegularFile(input, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    Path parent = output.getParent();
+                    if (parent != null) Files.createDirectories(parent);
+                    Files.copy(input, output, StandardCopyOption.COPY_ATTRIBUTES);
+                } else {
+                    throw new IOException("Unsupported file in Monster Maze map assets: " + input);
+                }
+            }
+        }
+    }
+
+    private static void deleteMonsterMazeRuntimeWorld(Path target, Path runtimeRoot, String worldName)
+            throws IOException {
+        Path safeTarget = target.toAbsolutePath().normalize();
+        Path safeRoot = runtimeRoot.toAbsolutePath().normalize().toRealPath();
+        if (!MONSTER_MAZE_WORLD_NAMES.contains(worldName) || !safeTarget.startsWith(safeRoot)
+                || safeTarget.equals(safeRoot) || !safeRoot.equals(safeTarget.getParent())
+                || !worldName.equals(safeTarget.getFileName().toString()) || Files.isSymbolicLink(safeTarget)
+                || (Files.exists(safeTarget) && !safeTarget.toRealPath().startsWith(safeRoot))) {
+            throw new IOException("Refusing to remove an unvalidated Monster Maze runtime copy: " + safeTarget);
+        }
+        if (!Files.exists(safeTarget, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        try (Stream<Path> paths = Files.walk(safeTarget)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(item);
+        }
+    }
+
+    private static void deleteMonsterMazeRuntimeStaging(Path staging, Path runtimeRoot) throws IOException {
+        Path safeStaging = staging.toAbsolutePath().normalize();
+        Path safeRoot = runtimeRoot.toAbsolutePath().normalize().toRealPath();
+        if (!safeStaging.startsWith(safeRoot) || safeStaging.equals(safeRoot)
+                || safeStaging.getParent() == null || !safeStaging.getParent().equals(safeRoot)
+                || !safeStaging.getFileName().toString().startsWith(".")) {
+            throw new IOException("Refusing to remove an unvalidated Monster Maze staging directory.");
+        }
+        try (Stream<Path> paths = Files.walk(safeStaging)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(item);
         }
     }
 
