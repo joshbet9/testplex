@@ -650,12 +650,12 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
             -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
-            -B 65536 -R 32)
+            -B 262144 -R 64)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           world_chunks=()
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
-            split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
+            split -b 8M -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
             mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
             test "${#world_chunks[@]}" -gt 0
           elif [[ "$MM_MAPS_REQUIRED" != false ]]; then
@@ -699,7 +699,7 @@ jobs:
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
           echo "Uploading verified JAR deltas, manifests, and required maps over SFTP."
-          timeout --foreground --signal=TERM --kill-after=10s 115s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=10s 240s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
             echo "SFTP payload transfer completed in ${upload_elapsed_seconds}s."
