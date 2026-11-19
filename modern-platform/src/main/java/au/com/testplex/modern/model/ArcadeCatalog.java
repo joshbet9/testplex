@@ -684,11 +684,20 @@ public final class ArcadeCatalog {
     }
 
     private static CosmeticLineDefinition monsterMazeMobSetLine() {
-        String[] mobSets = {"map_default", "creeper", "skeleton", "spider", "zombie", "slime", "witch",
-                "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
-                "endermite", "pig", "sheep", "cow", "chicken", "squid", "wolf", "mooshroom", "snowman",
-                "ocelot", "horse", "rabbit", "villager", "axolotl", "allay", "frog", "goat", "fox", "panda",
-                "parrot", "turtle", "bee", "sniffer", "armadillo", "random"};
+        String[] mobSets = {
+                "map_default", "allay", "armadillo", "axolotl", "bat", "bee", "blaze",
+                "bogged", "breeze", "camel", "camel_husk", "cat", "cave_spider", "chicken",
+                "cod", "copper_golem", "cow", "creaking", "creeper", "dolphin", "donkey",
+                "drowned", "elder_guardian", "enderman", "endermite", "evoker", "fox", "frog",
+                "glow_squid", "goat", "guardian", "hoglin", "horse", "husk", "illusioner",
+                "iron_golem", "llama", "magma_cube", "mooshroom", "mule", "nautilus", "ocelot",
+                "panda", "parched", "parrot", "phantom", "pig", "piglin", "piglin_brute",
+                "pillager", "polar_bear", "pufferfish", "rabbit", "ravager", "salmon", "sheep",
+                "shulker", "silverfish", "skeleton", "skeleton_horse", "slime", "sniffer", "snowman",
+                "spider", "squid", "stray", "strider", "sulfur_cube", "tadpole", "trader_llama",
+                "tropical_fish", "turtle", "vex", "villager", "vindicator", "wandering_trader", "warden",
+                "witch", "wither_skeleton", "wolf", "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
+                "zombie_pigman", "zombie_villager", "random"};
         String[] dyeColours = {"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
                 "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"};
         List<CosmeticOption> options = new ArrayList<>();
@@ -697,9 +706,7 @@ public final class ArcadeCatalog {
             String description = switch (mob) {
                 case "map_default" -> "Use the selected map's default mob and objective colours.";
                 case "random" -> "Use a stable random mob form for each player and maze entity.";
-                case "axolotl", "allay", "frog", "goat", "fox", "panda", "parrot", "turtle", "bee",
-                        "sniffer", "armadillo" -> "Modern mob form under two blocks tall and long.";
-                default -> display + " form.";
+                default -> display + " form; at most two maze blocks horizontally (no height limit).";
             };
             options.add(single(mob, display, description));
             for (String part : List.of("beacon", "pad")) {
