@@ -590,8 +590,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 p.getInventory().clear();
                 p.getInventory().setArmorContents(null);
                 p.setGameMode(GameMode.SURVIVAL);
-                p.setCollidable(false);
-
                 // Restore visibility for all players in lobby
                 for (Player target : arenaPlayers) p.showPlayer(target);
 
@@ -881,7 +879,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     private void preparePlayer(Player p) {
         p.setGameMode(GameMode.SURVIVAL);
-        p.setCollidable(false);
         kitManager.resetPlayerState(p);
         p.setHealth(p.getMaxHealth());
         p.setFoodLevel(20);
