@@ -24,7 +24,7 @@ class DragonEscapeMovementKitsTest {
     @Test
     void featherHeldRightClickOnlySpendsOnceUntilAnInputPause() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
-        assertEquals(200L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
+        assertEquals(100L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
         assertTrue(flutter.acceptRightClick(1_000L));
         assertTrue(flutter.useBounce(false, 1_000L));
         // A client holding the feather keeps emitting right-click packets.
@@ -32,31 +32,31 @@ class DragonEscapeMovementKitsTest {
             assertFalse(flutter.acceptRightClick(time));
         }
         assertEquals(4, flutter.charges, "Holding must not use multiple stored charges");
-        assertTrue(flutter.acceptRightClick(2_301L), "A fresh press after 200 ms quiet can bounce");
-        assertTrue(flutter.useBounce(false, 2_301L));
+        assertTrue(flutter.acceptRightClick(2_201L), "A fresh press after 100 ms quiet can bounce");
+        assertTrue(flutter.useBounce(false, 2_201L));
         assertEquals(3, flutter.charges);
-        assertFalse(flutter.acceptRightClick(2_302L), "Same-tick duplicate is ignored");
+        assertFalse(flutter.acceptRightClick(2_202L), "Same-tick duplicate is ignored");
 
         // Ground clicks must latch too: keeping the button held during takeoff
         // should never automatically consume a mid-air charge when repeats are frequent.
         var grounded = new DragonEscapeMovementKits.FlutterState();
         assertTrue(grounded.acceptRightClick(3_000L));
         assertFalse(grounded.useBounce(true, 3_000L));
-        assertFalse(grounded.acceptRightClick(3_200L));
+        assertFalse(grounded.acceptRightClick(3_100L));
         assertEquals(5, grounded.charges);
     }
 
     @Test
-    void featherCanChainAtJustOverTwoHundredMillisecondsInsteadOfFiveHundred() {
+    void featherCanChainAfterOneHundredMillisecondsOfQuiet() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         assertTrue(flutter.acceptRightClick(1_000L));
         assertTrue(flutter.useBounce(false, 1_000L));
-        assertFalse(flutter.acceptRightClick(1_199L), "199 ms is a held/repeated input");
-        assertTrue(flutter.acceptRightClick(1_400L), "201 ms quiet should allow another press");
-        assertTrue(flutter.useBounce(false, 1_400L));
-        assertFalse(flutter.acceptRightClick(1_599L));
-        assertTrue(flutter.acceptRightClick(1_800L));
-        assertTrue(flutter.useBounce(false, 1_800L));
+        assertFalse(flutter.acceptRightClick(1_100L), "100 ms is still inside the re-arm gap");
+        assertTrue(flutter.acceptRightClick(1_201L), "101 ms quiet should allow another press");
+        assertTrue(flutter.useBounce(false, 1_201L));
+        assertFalse(flutter.acceptRightClick(1_301L), "Exactly 100 ms is still inside the gap");
+        assertTrue(flutter.acceptRightClick(1_402L));
+        assertTrue(flutter.useBounce(false, 1_402L));
         assertEquals(2, flutter.charges);
     }
 
@@ -109,26 +109,52 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void featherBounceHasLowerSprintLikeArcAndPreservesFasterMomentum() {
+    void featherBounceUsesFacingDirectionAndPreservesHorizontalSpeed() {
         assertEquals(0.384D, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
+        Vector facingNorth = new Vector(0.0D, 0.2D, -1.0D);
         Vector north = DragonEscapeMovementKits.flutterBounceVelocity(
-                new Vector(0, -0.6, 0), new Vector(0, 0.2, -1),
-                true, false, false, false);
+                new Vector(0.0D, -0.6D, 0.0D), facingNorth);
         assertEquals(0.384D, Math.hypot(north.getX(), north.getZ()), 0.00001D);
         assertEquals(0.52D, north.getY(), 0.00001D);
         assertTrue(north.getZ() < -0.31D);
-        Vector diagonal = DragonEscapeMovementKits.flutterBounceVelocity(
-                new Vector(), new Vector(0, 0, -1), true, false, false, true);
-        assertEquals(0.384D, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
-        Vector momentum = DragonEscapeMovementKits.flutterBounceVelocity(
-                new Vector(0.3, 0, 0), new Vector(0, 0, -1),
-                false, false, false, false);
-        assertTrue(momentum.getX() >= 0.384D);
-        Vector fasterMomentum = DragonEscapeMovementKits.flutterBounceVelocity(
-                new Vector(0.42, 0, 0), new Vector(0, 0, -1),
-                false, false, false, false);
-        assertEquals(0.42D, fasterMomentum.getX(), 0.00001D,
-                "The feather cannot slow existing sprint momentum");
+        assertEquals(0.0D, north.getX(), 0.00001D);
+
+        Vector facingEast = new Vector(1.0D, 0.0D, 0.0D);
+        Vector sidewaysMomentum = DragonEscapeMovementKits.flutterBounceVelocity(
+                new Vector(0.0D, 0.0D, -0.42D), facingEast);
+        assertEquals(0.42D, sidewaysMomentum.getX(), 0.00001D,
+                "A facing-east bounce must turn the launch east despite northward momentum");
+        assertEquals(0.0D, sidewaysMomentum.getZ(), 0.00001D);
+
+        Vector fallback = DragonEscapeMovementKits.flutterTravelDirection(new Vector(0.0D, 1.0D, 0.0D));
+        assertEquals(0.0D, fallback.getX(), 0.00001D);
+        assertEquals(1.0D, fallback.getZ(), 0.00001D,
+                "A vertical look vector falls back to the stable north direction");
+    }
+
+    @Test
+    void dragonEscapeVisibilityAndGhostControlsUseSeparateHotbarSlots() {
+        assertEquals(4, DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT);
+        assertEquals(8, DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);
+        assertNotEquals(DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT,
+                DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);
+    }
+
+    @Test
+    void leapToolIsRemovedWhenTheLastChargeIsSpent() {
+        assertTrue(DragonEscapeMovementKits.shouldShowDragonEscapeLeapItem(1));
+        assertFalse(DragonEscapeMovementKits.shouldShowDragonEscapeLeapItem(0));
+        assertFalse(DragonEscapeMovementKits.shouldShowDragonEscapeLeapItem(-1));
+    }
+
+    @Test
+    void dragonEscapeVisibilityDefaultsToTheExistingInvisibleStateAndToggles() {
+        boolean visible = DragonEscapeMovementKits.dragonEscapePlayerVisibleByDefault();
+        assertFalse(visible, "The existing Dragon Escape default is invisible");
+        visible = DragonEscapeMovementKits.toggleDragonEscapePlayerVisibility(visible);
+        assertTrue(visible);
+        visible = DragonEscapeMovementKits.toggleDragonEscapePlayerVisibility(visible);
+        assertFalse(visible);
     }
 
     @Test
