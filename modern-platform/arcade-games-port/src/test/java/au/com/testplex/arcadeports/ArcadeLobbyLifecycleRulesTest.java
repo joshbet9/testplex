@@ -17,6 +17,15 @@ class ArcadeLobbyLifecycleRulesTest {
         assertEquals(true, ArcadeLobbyLifecycleRules.gameplayInputAllowed(true));
     }
 
+    @Test void onlyMonsterMazeAllowsWalkingDuringItsOwnStartCountdown() {
+        assertEquals(true, ArcadeLobbyLifecycleRules.allowPrepareMovement(ArcadePortGame.MONSTER_MAZE, "STARTING"));
+        assertEquals(true, ArcadeLobbyLifecycleRules.allowPrepareMovement(ArcadePortGame.MONSTER_MAZE_MODERN, "STARTING"));
+        assertEquals(false, ArcadeLobbyLifecycleRules.allowPrepareMovement(ArcadePortGame.MONSTER_MAZE, "LIVE"));
+        assertEquals(false, ArcadeLobbyLifecycleRules.allowPrepareMovement(ArcadePortGame.MONSTER_MAZE, "ENDING"));
+        assertEquals(false, ArcadeLobbyLifecycleRules.allowPrepareMovement(ArcadePortGame.DRAGONS, "STARTING"));
+        assertEquals(false, ArcadeLobbyLifecycleRules.allowPrepareMovement(null, "STARTING"));
+    }
+
     @Test void preparedTimeIsExcludedFromGameDeadlinesAndCooldowns() {
         assertEquals(15_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(5_000L, 10_000L));
         assertEquals(0L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(0L, 10_000L));
