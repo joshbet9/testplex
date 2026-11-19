@@ -76,23 +76,26 @@ class ArcadeCatalogTest {
         ArcadeCatalog catalog = new ArcadeCatalog();
         List<String> expected = List.of(
                 "map_default", "allay", "armadillo", "axolotl", "bat", "bee",
-                "blaze", "bogged", "breeze", "camel", "camel_husk", "cat",
-                "cave_spider", "chicken", "cod", "copper_golem", "cow", "creaking",
-                "creeper", "dolphin", "donkey", "drowned", "elder_guardian", "enderman",
-                "endermite", "evoker", "fox", "frog", "glow_squid", "goat",
-                "guardian", "hoglin", "horse", "husk", "illusioner", "iron_golem",
-                "llama", "magma_cube", "mooshroom", "mule", "nautilus", "ocelot",
-                "panda", "parched", "parrot", "phantom", "pig", "piglin",
-                "piglin_brute", "pillager", "polar_bear", "pufferfish", "rabbit", "ravager",
-                "salmon", "sheep", "shulker", "silverfish", "skeleton", "skeleton_horse",
-                "slime", "sniffer", "snowman", "spider", "squid", "stray",
-                "strider", "sulfur_cube", "tadpole", "trader_llama", "tropical_fish", "turtle",
-                "vex", "villager", "vindicator", "wandering_trader", "warden", "witch",
-                "wither_skeleton", "wolf", "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
-                "zombie_pigman", "zombie_villager", "random");
+                "blaze", "bogged", "breeze", "cat", "cave_spider", "chicken",
+                "cod", "copper_golem", "cow", "creaking", "creeper", "dolphin",
+                "donkey", "drowned", "enderman", "endermite", "evoker", "fox",
+                "frog", "glow_squid", "goat", "guardian", "hoglin", "horse",
+                "husk", "illusioner", "iron_golem", "llama", "magma_cube", "mooshroom",
+                "mule", "nautilus", "ocelot", "panda", "parched", "parrot",
+                "phantom", "pig", "piglin", "piglin_brute", "pillager", "polar_bear",
+                "pufferfish", "rabbit", "salmon", "sheep", "shulker", "silverfish",
+                "skeleton", "skeleton_horse", "slime", "snowman", "spider", "squid",
+                "stray", "strider", "sulfur_cube", "tadpole", "trader_llama", "tropical_fish",
+                "turtle", "vex", "villager", "vindicator", "wandering_trader", "warden",
+                "witch", "wither_skeleton", "wolf", "zoglin", "zombie", "zombie_horse",
+                "zombie_nautilus", "zombie_pigman", "zombie_villager", "random");
+        assertEquals(82, expected.size(), "80 mob forms plus Map Default and Random");
         assertTrue(expected.containsAll(List.of("wither_skeleton", "copper_golem", "sulfur_cube", "warden", "nautilus")));
         assertFalse(expected.contains("ghast"));
         assertFalse(expected.contains("happy_ghast"));
+        for (String oversized : List.of("sniffer", "camel", "camel_husk", "ravager", "elder_guardian")) {
+            assertFalse(expected.contains(oversized), oversized + " exceeds two square maze blocks");
+        }
         for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game);
