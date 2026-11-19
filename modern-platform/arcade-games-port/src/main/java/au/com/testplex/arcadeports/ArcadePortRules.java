@@ -1739,6 +1739,11 @@ public final class ArcadePortRules {
         return hasPlayerTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.FLY_TO_PORTAL;
     }
 
+    /** Newly spawned Dragons should pursue an eligible racer instead of starting on a sky waypoint. */
+    public static boolean shouldAssignDragonPlayerTargetOnSpawn(int eligibleTargetCount) {
+        return eligibleTargetCount > 0;
+    }
+
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
     public static boolean shouldAllowDragonEntityTarget(UUID requestedTargetId, UUID selectedTargetId,
             boolean targetAlive, boolean dragonControlled) {

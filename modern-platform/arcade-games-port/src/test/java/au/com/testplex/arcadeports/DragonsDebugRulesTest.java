@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -146,6 +147,15 @@ class DragonsDebugRulesTest {
         assertTrue(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, true));
         assertFalse(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, false));
         assertFalse(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGON_ESCAPE, true));
+    }
+
+    @Test
+    void newlySpawnedDragonsPreferLivingRacersAndUseSkyWaypointsOnlyWithoutTargets() {
+        assertFalse(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(0));
+        assertTrue(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(1));
+        assertTrue(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(3));
+        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+        assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
     }
 
     @Test

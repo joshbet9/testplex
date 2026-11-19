@@ -16813,12 +16813,27 @@ public final class ArcadePortManager implements Listener {
                 dragon.setCollidable(false);
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
-                Location initialSkyTarget = randomDragonSkyTarget(session);
-                session.dragonTargetLocations.put(dragon.getUniqueId(), initialSkyTarget);
-                // The source assigns a native dragon waypoint. Paper exposes the
-                // waypoint used by its flight phases through the dragon's podium.
-                dragon.setPodium(initialSkyTarget);
-                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
+                UUID dragonId = dragon.getUniqueId();
+                boolean hasInitialTargets = ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(
+                        possibleTargets.size());
+                Player initialTarget = hasInitialTargets
+                        ? possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size())) : null;
+                if (initialTarget != null) {
+                    // Start each new dragon on a living racer. Starting with a random
+                    // sky waypoint meant the native flight brain could circle above
+                    // the course indefinitely without ever reaching a player target.
+                    session.dragonTargetPlayers.put(dragonId, initialTarget.getUniqueId());
+                    Location playerTarget = initialTarget.getLocation().clone();
+                    session.dragonTargetLocations.put(dragonId, playerTarget);
+                    dragon.setTarget(initialTarget);
+                    dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(true));
+                } else {
+                    Location initialSkyTarget = randomDragonSkyTarget(session);
+                    session.dragonTargetLocations.put(dragonId, initialSkyTarget);
+                    // With no eligible racers, keep the source-style native waypoint flight.
+                    dragon.setPodium(initialSkyTarget);
+                    dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
+                }
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
