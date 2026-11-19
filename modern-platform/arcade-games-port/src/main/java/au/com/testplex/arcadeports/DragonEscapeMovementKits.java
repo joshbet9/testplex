@@ -23,8 +23,8 @@ final class DragonEscapeMovementKits {
     static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 200L;
     // A six-second interval regenerates Flutterfly charges 33.3% faster.
     static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 6_000L;
-    // Slightly quicker forward launch, closer to the feel of a sprint jump.
-    static final double FLUTTER_HORIZONTAL_SPEED = 0.32D;
+    // Raise the tested Flutterfly bounce's minimum horizontal impulse by 20%.
+    static final double FLUTTER_HORIZONTAL_SPEED = 0.384D;
     // Lower arc than the previous bounce, without changing regular jumps.
     static final double FLUTTER_BOUNCE_UPWARD_SPEED = 0.52D;
 

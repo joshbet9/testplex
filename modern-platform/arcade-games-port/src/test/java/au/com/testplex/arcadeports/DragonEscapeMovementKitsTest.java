@@ -110,20 +110,20 @@ class DragonEscapeMovementKitsTest {
 
     @Test
     void featherBounceHasLowerSprintLikeArcAndPreservesFasterMomentum() {
-        assertEquals(0.32D, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
+        assertEquals(0.384D, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
         Vector north = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(0, -0.6, 0), new Vector(0, 0.2, -1),
                 true, false, false, false);
-        assertEquals(0.32D, Math.hypot(north.getX(), north.getZ()), 0.00001D);
+        assertEquals(0.384D, Math.hypot(north.getX(), north.getZ()), 0.00001D);
         assertEquals(0.52D, north.getY(), 0.00001D);
         assertTrue(north.getZ() < -0.31D);
         Vector diagonal = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(), new Vector(0, 0, -1), true, false, false, true);
-        assertEquals(0.32D, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
+        assertEquals(0.384D, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
         Vector momentum = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(0.3, 0, 0), new Vector(0, 0, -1),
                 false, false, false, false);
-        assertTrue(momentum.getX() >= 0.32D);
+        assertTrue(momentum.getX() >= 0.384D);
         Vector fasterMomentum = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(0.42, 0, 0), new Vector(0, 0, -1),
                 false, false, false, false);
