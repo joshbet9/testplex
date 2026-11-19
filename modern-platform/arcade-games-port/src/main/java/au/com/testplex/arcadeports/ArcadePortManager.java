@@ -26706,7 +26706,9 @@ public final class ArcadePortManager implements Listener {
         if (current != StatsPage.KIT_LEVELS)
             tabs.add(new Tab(Material.BLAZE_POWDER, "Kit Levels", "View XP earned using each kit.",
                     "open-game-kit-levels"));
-        List<Integer> slots = ArcadeStatsLayout.footerSlots(tabs.size());
+        List<Integer> slots = current == StatsPage.MILESTONES
+                ? ArcadeStatsLayout.milestoneFooterSlots(tabs.size())
+                : ArcadeStatsLayout.footerSlots(tabs.size());
         for (int i = 0; i < tabs.size(); i++) {
             Tab tab = tabs.get(i);
             inventory.setItem(slots.get(i), statsItem(tab.icon(), ChatColor.AQUA + tab.name(),

@@ -69,13 +69,19 @@ class ArcadeStatsThirtyGameLayoutTest {
                         int column = columns.get(index);
                         int categorySlot = ArcadeStatsLayout.milestoneCategorySlot(column);
                         assertTrue(occupied.add(categorySlot), id + " colliding milestone category blocks");
+                        assertTrue(categorySlot >= 45, id + " milestone category is not on bottom row");
+                        assertFalse(categorySlot == ArcadeStatsLayout.PREVIOUS
+                                        || categorySlot == ArcadeStatsLayout.NEXT,
+                                id + " milestone category overlaps page navigation");
                         for (int stage = stageStart; stage < Math.min(visible.get(index).length, stageStart + 4); stage++) {
                             int slot = ArcadeStatsLayout.milestoneTierSlot(stage - stageStart, column);
                             assertTrue(occupied.add(slot), id + " milestone tier collision at " + slot);
-                            assertTrue(slot >= 0 && slot <= 44, id + " milestone outside content rows");
+                            assertTrue(slot >= 9 && slot <= 44, id + " milestone tier outside rows above category");
                             visitedTiers++;
                         }
                     }
+                    for (int footerSlot : ArcadeStatsLayout.milestoneFooterSlots(3))
+                        assertTrue(occupied.add(footerSlot), id + " milestone footer collision at " + footerSlot);
                 }
             }
             assertEquals(expectedTiers, visitedTiers, id + " milestone pagination lost tiers");
