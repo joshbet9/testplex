@@ -196,7 +196,10 @@ public final class MobThemeManager implements Listener {
     static List<String> allowedThemes(java.util.Collection<String> configured) {
         if (configured == null) return THEMES;
         java.util.Set<String> selected = new java.util.LinkedHashSet<>();
-        for (String choice : configured) selected.add(normalize(choice));
+        for (String choice : configured) {
+            String recognized = recognizedTheme(choice);
+            if (recognized != null) selected.add(recognized);
+        }
         List<String> enabled = THEMES.stream().filter(selected::contains).toList();
         return enabled.isEmpty() ? List.of("map_default") : enabled;
     }
@@ -296,10 +299,18 @@ public final class MobThemeManager implements Listener {
     private boolean visibleTo(Player p,PadVisual d){if(p==null||!p.isOnline()||d.center.getWorld()==null||!p.getWorld().equals(d.center.getWorld()))return false;Location l=p.getLocation();return Math.abs(l.getX()-d.center.getX())<=192&&Math.abs(l.getZ()-d.center.getZ())<=192;}
     private String palette(Player p){String s=selected(p);if("map_default".equals(s))return s;return "random".equals(s)?randomConcrete(p.getUniqueId(),null):s;}
     private String defaultTheme(){try{String s=plugin.getMapManager()==null?null:plugin.getMapManager().activeMob();return normalize(s==null?"creeper":s);}catch(Throwable ignored){return "creeper";}}
+    private static String recognizedTheme(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String id = raw.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("pig_zombie".equals(id) || "zombified_piglin".equals(id)) id = "zombie_pigman";
+        if ("snow_golem".equals(id)) id = "snowman";
+        if ("mushroom_cow".equals(id)) id = "mooshroom";
+        if ("eyeofender".equals(id) || "eye_of_ender".equals(id)) id = "enderman";
+        return THEMES.contains(id) ? id : null;
+    }
     static String normalize(String s) {
-        if(s==null||s.trim().isEmpty())return "creeper";s=s.trim().toLowerCase(Locale.ROOT).replace('-','_').replace(' ','_');
-        if("pig_zombie".equals(s)||"zombified_piglin".equals(s))s="zombie_pigman";if("snow_golem".equals(s))s="snowman";
-        if("mushroom_cow".equals(s))s="mooshroom";if("eyeofender".equals(s)||"eye_of_ender".equals(s))s="enderman";return THEMES.contains(s)?s:"creeper";
+        String recognized = recognizedTheme(s);
+        return recognized == null ? "creeper" : recognized;
     }
     static String randomConcrete(UUID viewer,UUID entity){int h=viewer.hashCode();if(entity!=null)h=31*h+entity.hashCode();return THEMES.get(1+Math.floorMod(h,THEMES.size()-2));}
     static String color(String s) {
