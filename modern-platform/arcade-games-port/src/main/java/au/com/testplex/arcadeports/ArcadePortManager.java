@@ -4329,6 +4329,9 @@ public final class ArcadePortManager implements Listener {
                 Team group = board.getTeam(groupName);
                 if (group == null) group = board.registerNewTeam(groupName);
                 group.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+                if (session.type == ArcadePortGame.PAINTBALL && teamId >= 0) {
+                    group.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+                }
                 group.setPrefix(ModernLobbyScoreboard.rankPrefix(plugin, tabPlayer));
                 if (teamId >= 0) {
                     group.setColor(ArcadePortRules.arcadeTeamChatColor(teamId));
