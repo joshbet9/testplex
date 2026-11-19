@@ -40,6 +40,7 @@ public final class MobThemeManager implements Listener {
     private final Map<UUID,String> choices = new LinkedHashMap<UUID,String>();
     private final Map<String,PadVisual> pads = new LinkedHashMap<String,PadVisual>();
     private boolean warnedMissingDisguise;
+    private final Map<UUID, Integer> lastVirtualMobClickTick = new HashMap<>();
     public MobThemeManager(MonsterMazePlugin plugin) {
         this.plugin=plugin; this.file=new File(plugin.getDataFolder(),"player-mob-themes.yml"); load();
         Bukkit.getPluginManager().registerEvents(this,plugin.getHostPlugin());
@@ -170,6 +171,21 @@ public final class MobThemeManager implements Listener {
         cycleTheme(p);
     }
 
+    /**
+     * PacketEvents knows about client-only display mob IDs, which Bukkit cannot
+     * resolve to a real PlayerInteractEntityEvent. This callback runs on the
+     * Bukkit primary thread after a legitimate main-hand click on one of the
+     * viewer's own cosmetic mobs; never accept arbitrary packet IDs.
+     */
+    public void cycleThemeFromVirtualMob(Player p) {
+        if (p == null || !p.isOnline()
+                || !isSelector(p.getInventory().getItemInMainHand())) return;
+        int tick = Bukkit.getCurrentTick();
+        Integer last = lastVirtualMobClickTick.put(p.getUniqueId(), tick);
+        if (last != null && last == tick) return; // duplicate INTERACT/INTERACT_AT
+        cycleTheme(p);
+    }
+
     private void cycleTheme(Player p) {
         List<String> enabled = enabledThemes(p);
         String c = nextTheme(selected(p), enabled);
@@ -252,6 +268,9 @@ public final class MobThemeManager implements Listener {
     }
     @EventHandler public void onDrop(PlayerDropItemEvent e){if(isSelector(e.getItemDrop().getItemStack()))e.setCancelled(true);}
     @EventHandler public void onJoin(PlayerJoinEvent e){laterRefresh(e.getPlayer());}
+    @EventHandler public void onQuit(PlayerQuitEvent e){
+        lastVirtualMobClickTick.remove(e.getPlayer().getUniqueId());
+    }
     @EventHandler public void onWorldChange(PlayerChangedWorldEvent e){laterRefresh(e.getPlayer());}
     @EventHandler public void onTeleport(PlayerTeleportEvent e){laterRefresh(e.getPlayer());}
     @EventHandler public void onMove(PlayerMoveEvent e) {
