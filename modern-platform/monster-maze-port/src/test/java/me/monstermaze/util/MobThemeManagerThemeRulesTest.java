@@ -37,10 +37,11 @@ class MobThemeManagerThemeRulesTest {
         var available = MobThemeManager.allowedThemes(Set.of("wither_skeleton",
                 "bogged", "breeze", "parched", "copper_golem", "sulfur_cube",
                 "nautilus", "zombie_nautilus", "camel_husk", "elder_guardian"));
-        assertEquals(10, available.size());
+        assertEquals(8, available.size(), "oversized new forms must not enter enabled cycle");
         assertTrue(available.contains("wither_skeleton"));
         assertTrue(available.contains("sulfur_cube"));
-        assertTrue(available.contains("camel_husk"));
+        assertFalse(available.contains("camel_husk"));
+        assertFalse(available.contains("elder_guardian"));
     }
 
     @Test
@@ -51,6 +52,29 @@ class MobThemeManagerThemeRulesTest {
         }
         assertEquals(List.of("map_default"),
                 MobThemeManager.allowedThemes(Set.of("ghast", "happy_ghast")));
+    }
+
+    @Test
+    void oversizedHorizontalFootprintIsExcludedEvenWhenItWasPreviouslySelectable() {
+        // Vanilla entity dimensions (X/Z square hitboxes); heights are irrelevant.
+        assertTrue(MobThemeManager.fitsMazeFloorFootprint(0.7, 0.7)); // Wither Skeleton: 2.4 high
+        assertTrue(MobThemeManager.fitsMazeFloorFootprint(0.9, 0.9)); // Warden: 2.9 high
+        assertTrue(MobThemeManager.fitsMazeFloorFootprint(1.4, 1.4)); // Spider / Iron Golem
+        assertTrue(MobThemeManager.fitsMazeFloorFootprint(1.3964844, 1.3964844)); // Horse
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(1.9, 1.9)); // Sniffer: 3.61 sq blocks
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(1.7, 1.7)); // Camel & Camel Husk: 2.89
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(1.95, 1.95)); // Ravager: 3.8025
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(1.9975, 1.9975)); // Elder Guardian
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(Double.NaN, 0.7));
+        assertFalse(MobThemeManager.fitsMazeFloorFootprint(0.0, 1.0));
+
+        for (String oversized : List.of("sniffer", "camel", "camel_husk", "ravager",
+                "elder_guardian", "ghast", "happy_ghast", "ender_dragon")) {
+            assertEquals("creeper", MobThemeManager.normalize(oversized), oversized);
+            assertFalse(MobThemeManager.allowedThemes(null).contains(oversized), oversized);
+        }
+        assertEquals(List.of("map_default"),
+                MobThemeManager.allowedThemes(Set.of("sniffer", "camel", "ravager")));
     }
 
     @Test

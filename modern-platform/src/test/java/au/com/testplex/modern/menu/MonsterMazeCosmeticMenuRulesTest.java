@@ -35,6 +35,11 @@ class MonsterMazeCosmeticMenuRulesTest {
         assertTrue(mobs.contains("axolotl"));
         assertTrue(mobs.contains("wither_skeleton"));
         assertTrue(mobs.contains("sulfur_cube"));
+        assertEquals(82, mobs.size(), "80 eligible mobs plus Map Default and Random");
+        for (String oversized : List.of("sniffer", "camel", "camel_husk",
+                "elder_guardian", "ravager")) {
+            assertFalse(mobs.contains(oversized), oversized + " must not take maze floor space");
+        }
         assertFalse(mobs.contains("ghast"));
         assertTrue(mobs.stream().noneMatch(id -> id.startsWith("pad-") || id.startsWith("beacon-")));
     }
