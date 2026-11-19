@@ -465,6 +465,11 @@ public class KitManager implements Listener {
         return Math.min(64, jumperMaxJumps() + pads / 5);
     }
 
+    /** A reached pad grants one jump only at milestones 5, 10, 15, etc.; never refills spent charges. */
+    static int jumperChargesAfterPad(int remaining, int reachedPadCount) {
+        return Math.min(64, Math.max(0, remaining) + (reachedPadCount > 0 && reachedPadCount % 5 == 0 ? 1 : 0));
+    }
+
     public boolean isJumper(Player player) {
         return player != null && getKit(player) == KitType.JUMPER;
     }
@@ -691,10 +696,15 @@ public class KitManager implements Listener {
             TextUtil.title(player, "", ChatColor.YELLOW + "" + ChatColor.BOLD + "You got to the Safe Pad!", 5, 40, 5);
         }
 
-        // Speed/Modern (QOL) modes: Jumper jumps reset to full on every Safe Pad.
+        // Modern Jumper: award precisely one additional jump each fifth Safe Pad.
+        // Ordinary pads do not replenish jumps already spent.
         if (game.qolEnabled() && getKit(player) == KitType.JUMPER) {
             int reached = jumperSafePads.merge(player.getUniqueId(), 1, Integer::sum);
-            setJumpsLeft(player, Math.min(64, jumperMaxJumps() + reached / 5));
+            if (reached % 5 == 0) {
+                ItemStack feather = player.getInventory().getItem(8);
+                int remaining = feather != null && feather.getType() == Material.FEATHER ? feather.getAmount() : 0;
+                setJumpsLeft(player, jumperChargesAfterPad(remaining, reached));
+            }
         }
     }
 
