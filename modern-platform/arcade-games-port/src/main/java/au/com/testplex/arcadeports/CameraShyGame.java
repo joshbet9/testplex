@@ -147,6 +147,18 @@ public final class CameraShyGame implements Listener {
         boolean lostSightDueToSmoke;
         Pursuit(UUID pursuer) { this.pursuer = pursuer; }
     }
+    private static final class MatchScoreboardView {
+        final Scoreboard scoreboard;
+        final Objective objective;
+        final List<Team> teams;
+        final List<String> entries;
+        MatchScoreboardView(Scoreboard scoreboard, Objective objective, List<Team> teams, List<String> entries) {
+            this.scoreboard = scoreboard;
+            this.objective = objective;
+            this.teams = teams;
+            this.entries = entries;
+        }
+    }
     private static final class PlayerSnapshot {
         final Location location;
         final ItemStack[] contents;
@@ -364,10 +376,7 @@ public final class CameraShyGame implements Listener {
     private final List<FakeFlash> fakeFlashes = new ArrayList<>();
     private final Map<UUID, ArmorStand> understudyStands = new HashMap<>();
     private final Map<UUID, BossBar> bossBars = new HashMap<>();
-    private Scoreboard matchScoreboard;
-    private Objective matchScoreboardObjective;
-    private final List<Team> matchScoreboardTeams = new ArrayList<>();
-    private final List<String> matchScoreboardEntries = new ArrayList<>();
+    private final Map<UUID, MatchScoreboardView> matchScoreboards = new HashMap<>();
     private long nextScoreboardUpdateAt;
     private final Map<UUID, Long> spotlightGlowUntil = new HashMap<>();
     private final Map<UUID, Boolean> spotlightOriginalGlow = new HashMap<>();
@@ -803,27 +812,57 @@ public final class CameraShyGame implements Listener {
 
     private void setupMatchScoreboard() {
         if (Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("snap", "dummy", ChatColor.GOLD + "SNAP");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        matchScoreboard = scoreboard;
-        matchScoreboardObjective = objective;
-        for (int index = 0; index < 15; index++) {
-            Team line = scoreboard.registerNewTeam("snapline" + index);
-            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
-            line.addEntry(entry);
-            matchScoreboardTeams.add(line);
-            matchScoreboardEntries.add(entry);
-        }
         for (Player player : players.values()) {
-            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+            if (player != null && player.isOnline()) setupMatchScoreboard(player);
         }
         updateMatchScoreboard(System.currentTimeMillis());
     }
 
+    private void setupMatchScoreboard(Player player) {
+        if (player == null || !player.isOnline() || Bukkit.getScoreboardManager() == null) return;
+        if (matchScoreboards.containsKey(player.getUniqueId())) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("snap", "dummy", ChatColor.GOLD + "SNAP");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        List<Team> teams = new ArrayList<>(15);
+        List<String> entries = new ArrayList<>(15);
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("snapline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            teams.add(line);
+            entries.add(entry);
+        }
+        MatchScoreboardView view = new MatchScoreboardView(scoreboard, objective, teams, entries);
+        matchScoreboards.put(player.getUniqueId(), view);
+        ArcadeCollisionRules.assign(player, scoreboard);
+    }
+
     private void updateMatchScoreboard(long now) {
-        if (matchScoreboardObjective == null || now < nextScoreboardUpdateAt) return;
+        if (matchScoreboards.isEmpty() || now < nextScoreboardUpdateAt) return;
         nextScoreboardUpdateAt = now + 500L;
+        for (Player player : players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            setupMatchScoreboard(player);
+            MatchScoreboardView view = matchScoreboards.get(player.getUniqueId());
+            if (view == null) continue;
+            List<String> lines = matchScoreboardLines(player, now);
+            for (int index = 0; index < view.teams.size(); index++) {
+                Team line = view.teams.get(index);
+                String entry = view.entries.get(index);
+                if (index < lines.size()) {
+                    line.setPrefix(limitScoreboardLine(lines.get(index)));
+                    view.objective.getScore(entry).setScore(lines.size() - index);
+                } else {
+                    line.setPrefix("");
+                    view.scoreboard.resetScores(entry);
+                }
+            }
+            if (player.getScoreboard() != view.scoreboard) ArcadeCollisionRules.assign(player, view.scoreboard);
+        }
+    }
+
+    private List<String> matchScoreboardLines(Player viewer, long now) {
         List<String> lines = new ArrayList<>();
         lines.add(finalSnapshot ? ChatColor.GOLD + "FINAL SNAPSHOT" : ChatColor.GREEN + "In Progress");
         lines.add(ChatColor.YELLOW + "Objective");
@@ -842,29 +881,16 @@ public final class CameraShyGame implements Listener {
                         .comparingInt((Player player) -> exposures.getOrDefault(player.getUniqueId(), 0)).reversed()
                         .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
                 .limit(4)
-                .forEach(player -> lines.add((alive.contains(player.getUniqueId()) ? ChatColor.YELLOW : ChatColor.GRAY)
-                        + player.getName() + ChatColor.WHITE + " "
-                        + exposures.getOrDefault(player.getUniqueId(), 0) + "/5"));
+                .forEach(player -> {
+                    ChatColor normalColor = alive.contains(player.getUniqueId()) ? ChatColor.YELLOW : ChatColor.GRAY;
+                    lines.add(ArcadeScoreboardNameRules.format(viewer.getUniqueId(), player.getUniqueId(),
+                            player.getName(), normalColor) + ChatColor.WHITE + " "
+                            + exposures.getOrDefault(player.getUniqueId(), 0) + "/5");
+                });
         lines.add("   ");
         lines.add(ChatColor.YELLOW + "Time Left: " + ChatColor.WHITE
                 + formatScoreboardTime(Math.max(0L, endsAt - now)));
-
-        for (int index = 0; index < matchScoreboardTeams.size(); index++) {
-            Team line = matchScoreboardTeams.get(index);
-            String entry = matchScoreboardEntries.get(index);
-            if (index < lines.size()) {
-                line.setPrefix(limitScoreboardLine(lines.get(index)));
-                matchScoreboardObjective.getScore(entry).setScore(lines.size() - index);
-            } else {
-                line.setPrefix("");
-                matchScoreboard.resetScores(entry);
-            }
-        }
-        for (Player player : players.values()) {
-            if (player != null && player.isOnline() && player.getScoreboard() != matchScoreboard) {
-                ArcadeCollisionRules.assign(player, matchScoreboard);
-            }
-        }
+        return lines;
     }
 
     private String formatScoreboardTime(long millis) {
@@ -877,19 +903,18 @@ public final class CameraShyGame implements Listener {
     }
 
     private void clearMatchScoreboard() {
-        if (matchScoreboard == null) return;
-        try {
-            for (Team team : new ArrayList<>(matchScoreboardTeams)) {
-                if (matchScoreboard.getTeam(team.getName()) != null) team.unregister();
+        for (MatchScoreboardView view : matchScoreboards.values()) {
+            try {
+                for (Team team : view.teams) {
+                    if (view.scoreboard.getTeam(team.getName()) != null) team.unregister();
+                }
+                if (view.objective != null
+                        && view.scoreboard.getObjective(view.objective.getName()) != null) view.objective.unregister();
+            } catch (IllegalArgumentException | IllegalStateException ignored) {
+                // Participants have already had their original board restored.
             }
-            if (matchScoreboardObjective != null) matchScoreboardObjective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException ignored) {
-            // Participants have already had their original board restored.
         }
-        matchScoreboardTeams.clear();
-        matchScoreboardEntries.clear();
-        matchScoreboard = null;
-        matchScoreboardObjective = null;
+        matchScoreboards.clear();
         nextScoreboardUpdateAt = 0L;
     }
 

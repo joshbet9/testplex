@@ -7494,31 +7494,64 @@ public final class ArcadePortManager implements Listener {
 
     private void setupSharedMatchScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("arcadematch", "dummy",
-                ChatColor.GOLD + session.type.displayName().toUpperCase(java.util.Locale.ROOT));
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.sharedMatchScoreboard = scoreboard;
-        session.sharedMatchScoreboardObjective = objective;
-        for (int index = 0; index < 15; index++) {
-            Team line = scoreboard.registerNewTeam("matchline" + index);
-            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
-            line.addEntry(entry);
-            session.sharedMatchScoreboardTeams.add(line);
-            session.sharedMatchScoreboardEntries.add(entry);
-        }
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+            if (player != null && player.isOnline()) setupSharedMatchScoreboard(session, player);
         }
         applySessionTeamTabTeams(session);
         updateSharedMatchScoreboard(session, System.currentTimeMillis());
     }
 
-    private void updateSharedMatchScoreboard(Session session, long now) {
-        if (session == null || session.sharedMatchScoreboardObjective == null
-                || now < session.sharedMatchNextScoreboardAt) return;
-        session.sharedMatchNextScoreboardAt = now + 500L;
+    private void setupSharedMatchScoreboard(Session session, Player player) {
+        if (session == null || player == null || !player.isOnline()
+                || Bukkit.getScoreboardManager() == null) return;
+        UUID viewerId = player.getUniqueId();
+        if (session.sharedMatchScoreboards.containsKey(viewerId)) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("arcadematch", "dummy",
+                ChatColor.GOLD + session.type.displayName().toUpperCase(java.util.Locale.ROOT));
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        List<Team> lineTeams = new ArrayList<>(15);
+        List<String> entries = new ArrayList<>(15);
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("matchline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            lineTeams.add(line);
+            entries.add(entry);
+        }
+        session.sharedMatchScoreboards.put(viewerId,
+                new SessionState.SharedMatchScoreboardView(scoreboard, objective, lineTeams, entries));
+        ArcadeCollisionRules.assign(player, scoreboard);
+    }
 
+    private void updateSharedMatchScoreboard(Session session, long now) {
+        if (session == null || now < session.sharedMatchNextScoreboardAt) return;
+        session.sharedMatchNextScoreboardAt = now + 500L;
+        for (Player viewer : session.players.values()) {
+            if (viewer == null || !viewer.isOnline()) continue;
+            setupSharedMatchScoreboard(session, viewer);
+            SessionState.SharedMatchScoreboardView view =
+                    session.sharedMatchScoreboards.get(viewer.getUniqueId());
+            if (view == null) continue;
+            List<String> lines = sharedMatchScoreboardLines(session, viewer, now);
+            for (int index = 0; index < view.lines.size(); index++) {
+                Team line = view.lines.get(index);
+                String entry = view.entries.get(index);
+                if (index < lines.size()) {
+                    String text = lines.get(index);
+                    line.setPrefix(text.length() <= 64 ? text : text.substring(0, 64));
+                    view.objective.getScore(entry).setScore(lines.size() - index);
+                } else {
+                    line.setPrefix("");
+                    view.scoreboard.resetScores(entry);
+                }
+            }
+            if (viewer.getScoreboard() != view.scoreboard) ArcadeCollisionRules.assign(viewer, view.scoreboard);
+        }
+        applySessionTeamTabTeams(session);
+    }
+
+    private List<String> sharedMatchScoreboardLines(Session session, Player viewer, long now) {
         List<String> lines = new ArrayList<>();
         if (session.type == ArcadePortGame.RUNNER) {
             List<RunnerScoreboardRules.PlayerEntry> runners = session.players.values().stream()
@@ -7553,11 +7586,12 @@ public final class ArcadePortManager implements Listener {
             List<Player> alive = alivePlayers(session);
             if (allPlayers.size() < 15) {
                 for (Player player : allPlayers) {
-                    lines.add(session.alive.contains(player.getUniqueId())
-                            ? ChatColor.GREEN + player.getName() : ChatColor.GRAY + player.getName());
+                    ChatColor colour = session.alive.contains(player.getUniqueId())
+                            ? ChatColor.GREEN : ChatColor.GRAY;
+                    lines.add(scoreboardPlayerName(player, viewer, colour));
                 }
             } else if (alive.size() < 16) {
-                for (Player player : alive) lines.add(ChatColor.GREEN + player.getName());
+                for (Player player : alive) lines.add(scoreboardPlayerName(player, viewer, ChatColor.GREEN));
             } else {
                 lines.add(ChatColor.GREEN + "Players Alive");
                 lines.add(ChatColor.WHITE + Integer.toString(alive.size()));
@@ -7571,7 +7605,7 @@ public final class ArcadePortManager implements Listener {
             if (alive.size() > 10) {
                 lines.add(ChatColor.WHITE + Integer.toString(alive.size()));
             } else {
-                for (Player player : alive) lines.add(ChatColor.WHITE + player.getName());
+                for (Player player : alive) lines.add(scoreboardPlayerName(player, viewer, ChatColor.WHITE));
             }
             lines.add(" ");
             lines.add(ChatColor.GREEN + "Throwable TNT");
@@ -7604,7 +7638,7 @@ public final class ArcadePortManager implements Listener {
             lines.add(ChatColor.GREEN + "Players Alive: " + ChatColor.WHITE + session.alive.size()
                     + "/" + session.participantIds.size());
 
-            List<String> scoreLines = sharedMatchScoreLines(session);
+            List<String> scoreLines = sharedMatchScoreLines(session, viewer);
             if (!scoreLines.isEmpty()) {
                 lines.add("   ");
                 lines.add(ChatColor.AQUA + (session.teams.values().stream().distinct().count() > 1
@@ -7623,31 +7657,34 @@ public final class ArcadePortManager implements Listener {
                         + formatMatchScoreboardTime(Math.max(0L, now - session.startedAt)));
             }
         }
-
-        Scoreboard scoreboard = session.sharedMatchScoreboard;
-        Objective objective = session.sharedMatchScoreboardObjective;
-        for (int index = 0; index < session.sharedMatchScoreboardTeams.size(); index++) {
-            Team line = session.sharedMatchScoreboardTeams.get(index);
-            String entry = session.sharedMatchScoreboardEntries.get(index);
-            if (index < lines.size()) {
-                line.setPrefix(lines.get(index).length() <= 64
-                        ? lines.get(index) : lines.get(index).substring(0, 64));
-                objective.getScore(entry).setScore(lines.size() - index);
-            } else {
-                line.setPrefix("");
-                scoreboard.resetScores(entry);
-            }
-        }
-
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
-                ArcadeCollisionRules.assign(player, scoreboard);
-            }
-        }
-        applySessionTeamTabTeams(session);
+        return lines;
     }
 
-    private List<String> sharedMatchScoreLines(Session session) {
+    private String scoreboardPlayerName(Player player, Player viewer, ChatColor fallback) {
+        if (player == null) return "";
+        return ArcadeScoreboardNameRules.format(viewer == null ? null : viewer.getUniqueId(),
+                player.getUniqueId(), player.getName(), fallback);
+    }
+
+    private void cleanupSharedMatchScoreboards(Session session) {
+        if (session == null) return;
+        for (SessionState.SharedMatchScoreboardView view : session.sharedMatchScoreboards.values()) {
+            try {
+                for (Team line : view.lines) {
+                    if (view.scoreboard.getTeam(line.getName()) != null) line.unregister();
+                }
+                if (view.objective != null
+                        && view.scoreboard.getObjective(view.objective.getName()) != null) {
+                    view.objective.unregister();
+                }
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().fine("Shared match scoreboard was already removed: " + exception.getMessage());
+            }
+        }
+        session.sharedMatchScoreboards.clear();
+    }
+
+    private List<String> sharedMatchScoreLines(Session session, Player viewer) {
         List<String> lines = new ArrayList<>();
         List<Integer> teamIds = session.teams.values().stream().distinct().sorted().toList();
         if (teamIds.size() > 1) {
@@ -7679,8 +7716,8 @@ public final class ArcadePortManager implements Listener {
                 .toList();
         for (int index = 0; index < leaders.size(); index++) {
             Player player = leaders.get(index);
-            lines.add(ChatColor.GRAY + "#" + (index + 1) + " " + ChatColor.WHITE
-                    + player.getName() + ChatColor.YELLOW + " "
+            lines.add(ChatColor.GRAY + "#" + (index + 1) + " "
+                    + scoreboardPlayerName(player, viewer, ChatColor.WHITE) + ChatColor.YELLOW + " "
                     + session.scores.getOrDefault(player.getUniqueId(), 0));
         }
         return lines;
@@ -7784,7 +7821,7 @@ public final class ArcadePortManager implements Listener {
             lines.add("  ");
             lines.add(ChatColor.YELLOW + "Players");
             if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
-            else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
+            else for (Player player : players) lines.add(scoreboardPlayerName(player, viewer, ChatColor.WHITE));
             GladiatorsMode scoreboardMode = GladiatorsMode.fromId(session.gladiatorMode);
             if (viewer != null && viewer.isOnline() && scoreboardMode != null
                     && scoreboardMode.usesModernCombat()
@@ -8787,85 +8824,97 @@ public final class ArcadePortManager implements Listener {
 
     private void setupBombLobbersScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("bomblob", "dummy",
-                ChatColor.GOLD + "BOMB LOBBERS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.bombLobbersScoreboard = scoreboard;
-        session.bombLobbersScoreboardObjective = objective;
-
-        Team redNames = scoreboard.registerNewTeam("blrednames");
-        redNames.setColor(ChatColor.RED);
-        redNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
-        Team blueNames = scoreboard.registerNewTeam("blbluenames");
-        blueNames.setColor(ChatColor.AQUA);
-        blueNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
-
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = scoreboard.registerNewObjective("bomblob", "dummy",
+                    ChatColor.GOLD + "BOMB LOBBERS");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            Team redNames = scoreboard.registerNewTeam("blrednames");
+            redNames.setColor(ChatColor.RED);
+            redNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+            Team blueNames = scoreboard.registerNewTeam("blbluenames");
+            blueNames.setColor(ChatColor.AQUA);
+            blueNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+            Team ownName = scoreboard.registerNewTeam("blownname");
+            ownName.setColor(ChatColor.GREEN);
+            ownName.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+            session.bombLobbersScoreboards.put(player.getUniqueId(),
+                    new SessionState.SidebarScoreboardView(scoreboard, objective, List.of(), new ArrayList<>()));
+            ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateBombLobbersScoreboard(session);
     }
 
     private void setupPaintballScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("paintball", "dummy", ChatColor.AQUA + "PAINTBALL");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.paintballScoreboard = scoreboard;
-        session.paintballScoreboardObjective = objective;
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = scoreboard.registerNewObjective("paintball", "dummy", ChatColor.AQUA + "PAINTBALL");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            session.paintballScoreboards.put(player.getUniqueId(),
+                    new SessionState.SidebarScoreboardView(scoreboard, objective, List.of(), new ArrayList<>()));
+            ArcadeCollisionRules.assign(player, scoreboard);
         }
         updatePaintballScoreboard(session, System.currentTimeMillis());
     }
 
     private void setupMasterBuildersScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("build", "dummy",
-                ChatColor.GOLD + "MASTER BUILDERS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.masterBuildersScoreboard = scoreboard;
-        session.masterBuildersScoreboardObjective = objective;
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = scoreboard.registerNewObjective("build", "dummy",
+                    ChatColor.GOLD + "MASTER BUILDERS");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            session.masterBuildersScoreboards.put(player.getUniqueId(),
+                    new SessionState.SidebarScoreboardView(scoreboard, objective, List.of(), new ArrayList<>()));
+            ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateMasterBuildersScoreboard(session, System.currentTimeMillis());
     }
 
     private void updateMasterBuildersScoreboard(Session session, long now) {
-        if (session == null || session.masterBuildersScoreboardObjective == null
+        if (session == null || session.masterBuildersScoreboards.isEmpty()
                 || now < session.masterBuildersNextScoreboardAt) return;
         session.masterBuildersNextScoreboardAt = now + 500L;
-        for (String entry : session.masterBuildersScoreboardEntries) {
-            session.masterBuildersScoreboard.resetScores(entry);
-        }
-        session.masterBuildersScoreboardEntries.clear();
+        for (Map.Entry<UUID, SessionState.SidebarScoreboardView> viewEntry
+                : session.masterBuildersScoreboards.entrySet()) {
+            UUID viewerId = viewEntry.getKey();
+            SessionState.SidebarScoreboardView view = viewEntry.getValue();
+            for (String entry : view.entries) view.scoreboard.resetScores(entry);
+            view.entries.clear();
+            List<String> lines = new ArrayList<>();
+            lines.add(ChatColor.YELLOW + "Theme: " + ChatColor.WHITE + session.masterBuilderTheme);
+            if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
+                long remaining = Math.max(0L, session.masterBuilderBuildEndsAt - now);
+                lines.add(ChatColor.GREEN + "Build Time");
+                lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
+            } else if (session.masterBuilderPhase == MasterBuildersPhase.REVIEW) {
+                long remaining = Math.max(0L, session.masterBuilderVoteEndsAt - now);
+                Player builder = session.masterBuilderCurrentTarget == null ? null
+                        : session.players.get(session.masterBuilderCurrentTarget);
+                String builderName = builder == null ? "Builder"
+                        : ArcadeScoreboardNameRules.format(viewerId, builder.getUniqueId(),
+                                builder.getName(), ChatColor.WHITE);
+                lines.add(ChatColor.GOLD + "Review " + (session.masterBuilderReviewIndex + 1)
+                        + "/" + session.masterBuilderReviewOrder.size());
+                lines.add(builderName);
+                lines.add(ChatColor.YELLOW + "Vote Time");
+                lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
+            }
+            lines.add(ChatColor.GRAY + "Players: " + ChatColor.WHITE + session.masterBuilderPlots.size());
 
-        List<String> lines = new ArrayList<>();
-        lines.add(ChatColor.YELLOW + "Theme: " + ChatColor.WHITE + session.masterBuilderTheme);
-        if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
-            long remaining = Math.max(0L, session.masterBuilderBuildEndsAt - now);
-            lines.add(ChatColor.GREEN + "Build Time");
-            lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
-        } else if (session.masterBuilderPhase == MasterBuildersPhase.REVIEW) {
-            long remaining = Math.max(0L, session.masterBuilderVoteEndsAt - now);
-            Player builder = session.masterBuilderCurrentTarget == null ? null
-                    : session.players.get(session.masterBuilderCurrentTarget);
-            String builderName = builder == null ? "Builder" : builder.getName();
-            lines.add(ChatColor.GOLD + "Review " + (session.masterBuilderReviewIndex + 1)
-                    + "/" + session.masterBuilderReviewOrder.size());
-            lines.add(ChatColor.WHITE + builderName);
-            lines.add(ChatColor.YELLOW + "Vote Time");
-            lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
-        }
-        lines.add(ChatColor.GRAY + "Players: " + ChatColor.WHITE + session.masterBuilderPlots.size());
-
-        int score = lines.size();
-        for (String line : lines) {
-            session.masterBuildersScoreboardEntries.add(line);
-            session.masterBuildersScoreboardObjective.getScore(line).setScore(score--);
+            int score = lines.size();
+            for (String line : lines) {
+                view.entries.add(line);
+                view.objective.getScore(line).setScore(score--);
+            }
+            Player viewer = session.players.get(viewerId);
+            if (viewer != null && viewer.isOnline() && viewer.getScoreboard() != view.scoreboard) {
+                ArcadeCollisionRules.assign(viewer, view.scoreboard);
+            }
         }
     }
 
@@ -8875,99 +8924,108 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void cleanupMasterBuildersScoreboard(Session session) {
-        if (session == null || session.masterBuildersScoreboardObjective == null) return;
-        try {
-            session.masterBuildersScoreboardObjective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Master Builders scoreboard was already removed: " + exception.getMessage());
+        if (session == null) return;
+        for (SessionState.SidebarScoreboardView view : session.masterBuildersScoreboards.values()) {
+            try {
+                if (view.objective != null && view.scoreboard.getObjective(view.objective.getName()) != null) {
+                    view.objective.unregister();
+                }
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().fine("Master Builders scoreboard was already removed: " + exception.getMessage());
+            }
         }
-        session.masterBuildersScoreboard = null;
-        session.masterBuildersScoreboardObjective = null;
-        session.masterBuildersScoreboardEntries.clear();
+        session.masterBuildersScoreboards.clear();
     }
 
     private void updatePaintballScoreboard(Session session, long now) {
-        if (session == null || session.paintballScoreboardObjective == null
+        if (session == null || session.paintballScoreboards.isEmpty()
                 || now < session.paintballNextScoreboardAt) return;
         session.paintballNextScoreboardAt = now + 500L;
-        for (String entry : session.paintballScoreboardEntries) {
-            session.paintballScoreboard.resetScores(entry);
-        }
-        session.paintballScoreboardEntries.clear();
-
-        List<String> lines = new ArrayList<>();
         List<Player> living = alivePlayers(session);
-        if (living.size() < 13) {
-            for (int team = 0; team < 2; team++) {
-                final int teamIndex = team;
-                ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
-                living.stream()
-                        .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
-                        .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                        .forEach(player -> lines.add(colour + player.getName()));
+        for (Map.Entry<UUID, SessionState.SidebarScoreboardView> viewEntry : session.paintballScoreboards.entrySet()) {
+            UUID viewerId = viewEntry.getKey();
+            SessionState.SidebarScoreboardView view = viewEntry.getValue();
+            for (String entry : view.entries) view.scoreboard.resetScores(entry);
+            view.entries.clear();
+            List<String> lines = new ArrayList<>();
+            if (living.size() < 13) {
+                for (int team = 0; team < 2; team++) {
+                    final int teamIndex = team;
+                    ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
+                    living.stream()
+                            .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
+                            .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                            .forEach(player -> lines.add(ArcadeScoreboardNameRules.format(viewerId,
+                                    player.getUniqueId(), player.getName(), colour)));
+                }
+            } else {
+                for (int team = 0; team < 2; team++) {
+                    int teamIndex = team;
+                    ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
+                    String name = team == 0 ? "Frost" : "Nether";
+                    long aliveCount = living.stream()
+                            .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
+                            .count();
+                    lines.add(colour + name + ChatColor.WHITE + ": " + aliveCount + colour + " Alive");
+                }
             }
-        } else {
-            for (int team = 0; team < 2; team++) {
-                int teamIndex = team;
-                ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
-                String name = team == 0 ? "Frost" : "Nether";
-                long alive = living.stream()
-                        .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
-                        .count();
-                lines.add(colour + name + ChatColor.WHITE + ": " + alive + colour + " Alive");
+            int score = lines.size();
+            for (String line : lines) {
+                view.entries.add(line);
+                view.objective.getScore(line).setScore(score--);
             }
-        }
-        int score = lines.size();
-        for (String line : lines) {
-            session.paintballScoreboardEntries.add(line);
-            session.paintballScoreboardObjective.getScore(line).setScore(score--);
-        }
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline() && player.getScoreboard() != session.paintballScoreboard) {
-                ArcadeCollisionRules.assign(player, session.paintballScoreboard);
+            Player viewer = session.players.get(viewerId);
+            if (viewer != null && viewer.isOnline() && viewer.getScoreboard() != view.scoreboard) {
+                ArcadeCollisionRules.assign(viewer, view.scoreboard);
             }
         }
     }
 
     private void updateBombLobbersScoreboard(Session session) {
-        if (session == null || session.bombLobbersScoreboardObjective == null) return;
-        Objective objective = session.bombLobbersScoreboardObjective;
-        for (String entry : session.bombLobbersScoreboardEntries) objective.getScoreboard().resetScores(entry);
-        session.bombLobbersScoreboardEntries.clear();
-
-        List<String> redPlayers = new ArrayList<>();
-        List<String> bluePlayers = new ArrayList<>();
-        Team redNames = objective.getScoreboard().getTeam("blrednames");
-        Team blueNames = objective.getScoreboard().getTeam("blbluenames");
+        if (session == null || session.bombLobbersScoreboards.isEmpty()) return;
         Set<UUID> aliveIds = new HashSet<>();
         for (Player alive : alivePlayers(session)) aliveIds.add(alive.getUniqueId());
-        for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline()) continue;
-            if (player.getScoreboard() != objective.getScoreboard()) ArcadeCollisionRules.assign(player, objective.getScoreboard());
-            int playerTeam = session.teams.getOrDefault(player.getUniqueId(), -1);
-            if (playerTeam == 0) {
-                if (aliveIds.contains(player.getUniqueId())) redPlayers.add(player.getName());
-                if (redNames != null && objective.getScoreboard().getEntryTeam(player.getName()) != redNames) {
-                    redNames.addEntry(player.getName());
+        for (Map.Entry<UUID, SessionState.SidebarScoreboardView> viewEntry
+                : session.bombLobbersScoreboards.entrySet()) {
+            UUID viewerId = viewEntry.getKey();
+            SessionState.SidebarScoreboardView view = viewEntry.getValue();
+            Scoreboard scoreboard = view.scoreboard;
+            for (String entry : view.entries) scoreboard.resetScores(entry);
+            view.entries.clear();
+            Team redNames = scoreboard.getTeam("blrednames");
+            Team blueNames = scoreboard.getTeam("blbluenames");
+            Team ownName = scoreboard.getTeam("blownname");
+            List<String> redPlayers = new ArrayList<>();
+            List<String> bluePlayers = new ArrayList<>();
+            for (Player player : session.players.values()) {
+                if (player == null || !player.isOnline()) continue;
+                int playerTeam = session.teams.getOrDefault(player.getUniqueId(), -1);
+                ChatColor teamColor = playerTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
+                Team desired = player.getUniqueId().equals(viewerId) ? ownName
+                        : playerTeam == 0 ? redNames : playerTeam == 1 ? blueNames : null;
+                Team current = scoreboard.getEntryTeam(player.getName());
+                if (current != desired) {
+                    if (current != null) current.removeEntry(player.getName());
+                    if (desired != null) desired.addEntry(player.getName());
                 }
-            } else if (playerTeam == 1) {
-                if (aliveIds.contains(player.getUniqueId())) bluePlayers.add(player.getName());
-                if (blueNames != null && objective.getScoreboard().getEntryTeam(player.getName()) != blueNames) {
-                    blueNames.addEntry(player.getName());
+                if (playerTeam == 0 && aliveIds.contains(player.getUniqueId())) {
+                    redPlayers.add(ArcadeScoreboardNameRules.format(viewerId, player.getUniqueId(),
+                            player.getName(), teamColor));
+                } else if (playerTeam == 1 && aliveIds.contains(player.getUniqueId())) {
+                    bluePlayers.add(ArcadeScoreboardNameRules.format(viewerId, player.getUniqueId(),
+                            player.getName(), teamColor));
                 }
             }
+            int score = 15;
+            for (String line : ArcadePortRules.bombLobbersScoreboardRoster(redPlayers, bluePlayers)) {
+                view.objective.getScore(line).setScore(score--);
+                view.entries.add(line);
+            }
+            Player viewer = session.players.get(viewerId);
+            if (viewer != null && viewer.isOnline() && viewer.getScoreboard() != scoreboard) {
+                ArcadeCollisionRules.assign(viewer, scoreboard);
+            }
         }
-
-        int score = 15;
-        for (String line : ArcadePortRules.bombLobbersScoreboardRoster(redPlayers, bluePlayers)) {
-            score = addBombLobbersScoreboardLine(session, line, score);
-        }
-    }
-
-    private int addBombLobbersScoreboardLine(Session session, String text, int score) {
-        session.bombLobbersScoreboardObjective.getScore(text).setScore(score);
-        session.bombLobbersScoreboardEntries.add(text);
-        return score - 1;
     }
 
     private void updateDeathTagLights(Session session, long now) {
@@ -14652,7 +14710,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionScoreboards(session, now);
-        else if (session.sharedMatchScoreboardObjective != null) updateSharedMatchScoreboard(session, now);
+        else if (!session.sharedMatchScoreboards.isEmpty()) updateSharedMatchScoreboard(session, now);
         if (session.liveStarted) updateLegacyNaturalRegeneration(session);
         if (session.type.isMonsterMaze()) {
             if (!monsterMazeRunning()) finish(session, null, true);
@@ -15090,23 +15148,24 @@ public final class ArcadePortManager implements Listener {
      */
     private void setupBaconDisguiseNameTags(Session session, List<Player> participants) {
         if (Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
         String teamName = "bb" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         try {
-            Team disguiseTeam = scoreboard.registerNewTeam(teamName);
-            disguiseTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
-            // Bacon avatars replace the players visually; prevent the hidden player bodies
-            // from pushing against each other while preserving normal hit targeting.
-            disguiseTeam.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
-            session.baconDisguiseScoreboard = scoreboard;
-            session.baconDisguiseTeam = disguiseTeam;
             for (Player player : participants) {
+                if (player == null || !player.isOnline()) continue;
+                Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+                Team disguiseTeam = scoreboard.registerNewTeam(teamName);
+                disguiseTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+                // Bacon avatars replace the players visually; prevent hidden player bodies
+                // from pushing while retaining normal hit targeting.
+                disguiseTeam.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+                for (Player participant : participants) {
+                    if (participant != null && participant.isOnline()) disguiseTeam.addEntry(participant.getName());
+                }
+                session.baconDisguiseScoreboards.put(player.getUniqueId(), scoreboard);
+                session.baconDisguiseTeams.put(player.getUniqueId(), disguiseTeam);
                 ArcadeCollisionRules.assign(player, scoreboard);
                 String entry = player.getName();
-                Team previous = scoreboard.getEntryTeam(entry);
-                session.baconPreviousNameTeams.put(player.getUniqueId(), previous == disguiseTeam ? null : previous);
                 session.baconNameEntries.put(player.getUniqueId(), entry);
-                disguiseTeam.addEntry(entry);
             }
         } catch (IllegalArgumentException | IllegalStateException exception) {
             plugin.getLogger().warning("Could not hide Bacon Brawl player nameplates: " + exception.getMessage());
@@ -15116,117 +15175,107 @@ public final class ArcadePortManager implements Listener {
 
     private void restoreBaconDisguiseNameTagEntry(Session session, UUID playerId) {
         String entry = session.baconNameEntries.remove(playerId);
-        Team disguiseTeam = session.baconDisguiseTeam;
-        Scoreboard scoreboard = session.baconDisguiseScoreboard;
         if (entry == null) return;
-        if (disguiseTeam != null) {
+        for (Team disguiseTeam : session.baconDisguiseTeams.values()) {
             try {
                 disguiseTeam.removeEntry(entry);
             } catch (IllegalStateException ignored) {
                 // Another plugin may already have removed the temporary team.
             }
         }
-        Team previous = session.baconPreviousNameTeams.remove(playerId);
-        if (previous == null || scoreboard == null) return;
-        try {
-            Team currentlyRegistered = scoreboard.getTeam(previous.getName());
-            if (currentlyRegistered != null && currentlyRegistered != disguiseTeam) {
-                currentlyRegistered.addEntry(entry);
-            }
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().warning("Could not restore scoreboard team for " + entry
-                    + " after Bacon Brawl: " + exception.getMessage());
-        }
+        session.baconPreviousNameTeams.remove(playerId);
     }
 
     private void cleanupBaconDisguiseNameTags(Session session) {
-        Team disguiseTeam = session.baconDisguiseTeam;
-        Scoreboard scoreboard = session.baconDisguiseScoreboard;
-        if (disguiseTeam == null || scoreboard == null) return;
         for (UUID playerId : new ArrayList<>(session.baconNameEntries.keySet())) {
             restoreBaconDisguiseNameTagEntry(session, playerId);
         }
-        try {
-            if (scoreboard.getTeam(disguiseTeam.getName()) != null) disguiseTeam.unregister();
-        } catch (IllegalStateException ignored) {
-            // Already unregistered by another plugin.
+        for (Map.Entry<UUID, Team> entry : session.baconDisguiseTeams.entrySet()) {
+            Scoreboard scoreboard = session.baconDisguiseScoreboards.get(entry.getKey());
+            try {
+                if (scoreboard != null && scoreboard.getTeam(entry.getValue().getName()) != null) {
+                    entry.getValue().unregister();
+                }
+            } catch (IllegalStateException ignored) {
+                // Already unregistered by another plugin.
+            }
         }
-        session.baconDisguiseTeam = null;
-        session.baconDisguiseScoreboard = null;
+        session.baconDisguiseTeams.clear();
+        session.baconDisguiseScoreboards.clear();
         session.baconPreviousNameTeams.clear();
         session.baconNameEntries.clear();
     }
 
     private void setupBaconMeterScoreboard(Session session) {
         if (Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = session.baconDisguiseScoreboard;
-        if (scoreboard == null) {
-            scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-            for (Player player : session.players.values()) {
-                if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = session.baconDisguiseScoreboards.get(player.getUniqueId());
+            if (scoreboard == null) {
+                scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+                ArcadeCollisionRules.assign(player, scoreboard);
             }
-        }
-        session.baconMeterScoreboard = scoreboard;
-        session.baconPreviousSidebar = scoreboard.getObjective(DisplaySlot.SIDEBAR);
-        String objectiveName = "bbm" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        Objective objective = scoreboard.registerNewObjective(objectiveName, "dummy",
-                ChatColor.GOLD + "BACON BRAWL");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.baconMeterObjective = objective;
-        for (int i = 0; i < 15; i++) {
-            Team lineTeam = scoreboard.registerNewTeam("bbmline" + i);
-            String entry = ChatColor.values()[i].toString();
-            lineTeam.addEntry(entry);
-            session.baconMeterTeams.add(lineTeam);
-            session.baconMeterEntries.add(entry);
+            String objectiveName = "bbm" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            Objective objective = scoreboard.registerNewObjective(objectiveName, "dummy",
+                    ChatColor.GOLD + "BACON BRAWL");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            List<Team> lineTeams = new ArrayList<>(15);
+            List<String> entries = new ArrayList<>(15);
+            for (int i = 0; i < 15; i++) {
+                Team lineTeam = scoreboard.registerNewTeam("bbmline" + i);
+                String entry = ChatColor.values()[i].toString();
+                lineTeam.addEntry(entry);
+                lineTeams.add(lineTeam);
+                entries.add(entry);
+            }
+            session.baconMeterScoreboards.put(player.getUniqueId(),
+                    new SessionState.SidebarScoreboardView(scoreboard, objective, lineTeams, entries));
+            ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateBaconMeterScoreboard(session);
     }
 
     private void updateBaconMeterScoreboard(Session session) {
-        if (session.baconMeterScoreboard == null || session.baconMeterObjective == null
-                || session.type != ArcadePortGame.BACON_BRAWL) return;
+        if (session.baconMeterScoreboards.isEmpty() || session.type != ArcadePortGame.BACON_BRAWL) return;
         List<Player> alive = alivePlayers(session).stream()
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        List<String> lines = ArcadePortRules.baconBrawlSidebarLines(
-                alive.stream().map(Player::getName).toList());
-        for (int i = 0; i < session.baconMeterTeams.size(); i++) {
-            Team lineTeam = session.baconMeterTeams.get(i);
-            String entry = session.baconMeterEntries.get(i);
-            if (i < lines.size()) {
-                lineTeam.setPrefix(ChatColor.WHITE + lines.get(i));
-                lineTeam.setSuffix("");
-                session.baconMeterObjective.getScore(entry).setScore(15 - i);
-            } else {
-                lineTeam.setPrefix("");
-                lineTeam.setSuffix("");
-                session.baconMeterScoreboard.resetScores(entry);
+        for (Map.Entry<UUID, SessionState.SidebarScoreboardView> scoreboardEntry
+                : session.baconMeterScoreboards.entrySet()) {
+            UUID viewerId = scoreboardEntry.getKey();
+            SessionState.SidebarScoreboardView view = scoreboardEntry.getValue();
+            List<String> lines = ArcadePortRules.baconBrawlSidebarLines(alive.stream()
+                    .map(player -> ArcadeScoreboardNameRules.format(viewerId, player.getUniqueId(),
+                            player.getName(), ChatColor.WHITE)).toList());
+            for (int i = 0; i < view.lines.size(); i++) {
+                Team lineTeam = view.lines.get(i);
+                String entry = view.entries.get(i);
+                if (i < lines.size()) {
+                    lineTeam.setPrefix(ChatColor.WHITE + lines.get(i));
+                    lineTeam.setSuffix("");
+                    view.objective.getScore(entry).setScore(15 - i);
+                } else {
+                    lineTeam.setPrefix("");
+                    lineTeam.setSuffix("");
+                    view.scoreboard.resetScores(entry);
+                }
             }
         }
     }
 
     private void cleanupBaconMeterScoreboard(Session session) {
-        Scoreboard scoreboard = session.baconMeterScoreboard;
-        Objective objective = session.baconMeterObjective;
-        if (scoreboard == null || objective == null) return;
-        try {
-            if (scoreboard.getObjective(DisplaySlot.SIDEBAR) == objective
-                    && session.baconPreviousSidebar != null) {
-                session.baconPreviousSidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
+        for (SessionState.SidebarScoreboardView view : session.baconMeterScoreboards.values()) {
+            try {
+                for (Team team : view.lines) {
+                    if (view.scoreboard.getTeam(team.getName()) != null) team.unregister();
+                }
+                if (view.objective != null
+                        && view.scoreboard.getObjective(view.objective.getName()) != null) view.objective.unregister();
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().fine("Bacon Brawl meter scoreboard was already removed: " + exception.getMessage());
             }
-            for (Team team : new ArrayList<>(session.baconMeterTeams)) {
-                if (scoreboard.getTeam(team.getName()) != null) team.unregister();
-            }
-            objective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Bacon Brawl meter scoreboard was already removed: " + exception.getMessage());
         }
-        session.baconMeterTeams.clear();
-        session.baconMeterEntries.clear();
-        session.baconMeterScoreboard = null;
-        session.baconMeterObjective = null;
-        session.baconPreviousSidebar = null;
+        session.baconMeterScoreboards.clear();
     }
 
     private String baconMeterBar(int percent) {
@@ -23936,6 +23985,7 @@ public final class ArcadePortManager implements Listener {
         session.runnerTrailOptions.clear();
         session.runnerMapPaletteCounts.clear();
         cleanupBaconDisguiseNameTags(session);
+        cleanupSharedMatchScoreboards(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             cleanupBaconPlayerVisibility(session);
             cleanupBaconMeterScoreboard(session);

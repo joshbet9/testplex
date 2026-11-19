@@ -62,6 +62,10 @@ public class GameScoreboard {
         public PlayerDistance(String name, String distance) { this.name=name==null?"?":name; this.distance=distance==null?"?":distance; }
     }
 
+    public static ChatColor playerNameColor(boolean safe, boolean own) {
+        return safe || own ? ChatColor.GREEN : ChatColor.YELLOW;
+    }
+
     public void update(Player p, int alive, int stage, int phaseSeconds, boolean hasPad, String mode, String pbText,
                        List<PlayerDistance> standings) {
         Scoreboard board=boardFor(p);Objective obj=board.getObjective("mm");if(obj==null)return;
@@ -88,9 +92,10 @@ public class GameScoreboard {
             String name=player.name.length()>14?player.name.substring(0,14):player.name;
             int score=12-i;
             boolean safe = "SAFE".equalsIgnoreCase(player.distance);
+            boolean own = player.name.equalsIgnoreCase(p.getName());
             String distanceSuffix = safe ? "" : ChatColor.GRAY + " " + player.distance + "m";
             setLine(board,obj,"line_p"+i,getUniqueEntry(score),score,
-                    (safe ? ChatColor.GREEN : ChatColor.YELLOW) + name, distanceSuffix);
+                    playerNameColor(safe, own) + name, distanceSuffix);
         }
         for(int i=count;i<pageSize;i++)removeLine(board,"line_p"+i);
         setSpacer(obj,6);
