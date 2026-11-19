@@ -161,7 +161,7 @@ public final class MobThemeManager implements Listener {
         String c = nextTheme(selected(p), enabled);
         choices.put(p.getUniqueId(), c);
         save();giveSelector(p);plugin.refreshPlayerMobThemes(p);refreshPlayerPads(p);
-        if(!plugin.hasPerPlayerMobDisguises()&&!warnedMissingDisguise){p.sendMessage(ChatColor.RED+"Mob appearance changes require ProtocolLib; Safe Pad and beacon colours still update.");warnedMissingDisguise=true;}
+        if(!plugin.hasPerPlayerMobDisguises()&&!warnedMissingDisguise){p.sendMessage(ChatColor.RED+"Mob appearance needs PacketEvents or ProtocolLib; Safe Pad and beacon colours still update.");warnedMissingDisguise=true;}
         p.sendMessage(ChatColor.LIGHT_PURPLE+"Mob theme: "+ChatColor.YELLOW+displayName(selected(p))+ChatColor.GRAY+" (personal view).");
     }
 

@@ -150,22 +150,38 @@ public final class MonsterMazePlugin {
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=gameplay-listeners-created");
-        if (Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
+        // The already-deployed PacketEvents plugin is preferred over optional ProtocolLib.
+        // Load only by reflection: a missing packet plugin must not break the game module.
+        if (Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
             try {
-                Class<?> adapterType = Class.forName("me.monstermaze.entity.MonsterDisguiseListener");
-                Object adapter = adapterType.getConstructor(MonsterMazePlugin.class).newInstance(this);
-                java.lang.reflect.Method refresh = adapterType.getMethod("refreshPlayer", Player.class);
-                java.lang.reflect.Method shutdown = adapterType.getMethod("shutdown");
-                this.monsterDisguiseListener = adapter;
-                this.refreshMonsterDisguisesMethod = refresh;
-                this.shutdownMonsterDisguisesMethod = shutdown;
-                getLogger().info("ProtocolLib detected; Monster Maze ghost-mob disguises enabled.");
-            } catch (Throwable t) {
+                Class<?> type = Class.forName("me.monstermaze.entity.MonsterMazePacketDisguiseBridge");
+                Object bridge = type.getConstructor(MonsterMazePlugin.class).newInstance(this);
+                if (Boolean.TRUE.equals(type.getMethod("register").invoke(bridge))) {
+                    monsterDisguiseListener = bridge;
+                    refreshMonsterDisguisesMethod = type.getMethod("refreshPlayer", Player.class);
+                    shutdownMonsterDisguisesMethod = type.getMethod("shutdown");
+                    getLogger().info("PacketEvents detected; viewer-specific Monster Maze mob appearances enabled.");
+                }
+            } catch (Throwable failure) {
                 getLogger().log(Level.WARNING,
-                        "ProtocolLib is present but ghost-mob disguises could not be enabled; base mob rendering will remain active.", t);
+                        "PacketEvents mob-appearance bridge failed; trying optional ProtocolLib.", failure);
             }
-        } else {
-            getLogger().warning("ProtocolLib not installed; Monster Maze mobs will render as Snow Golems.");
+        }
+        if (monsterDisguiseListener == null && Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
+            try {
+                Class<?> type = Class.forName("me.monstermaze.entity.MonsterDisguiseListener");
+                Object bridge = type.getConstructor(MonsterMazePlugin.class).newInstance(this);
+                monsterDisguiseListener = bridge;
+                refreshMonsterDisguisesMethod = type.getMethod("refreshPlayer", Player.class);
+                shutdownMonsterDisguisesMethod = type.getMethod("shutdown");
+                getLogger().info("ProtocolLib fallback detected; Monster Maze mob appearances enabled.");
+            } catch (Throwable failure) {
+                getLogger().log(Level.WARNING, "ProtocolLib mob-appearance fallback failed.", failure);
+            }
+        }
+        if (monsterDisguiseListener == null) {
+            getLogger().warning("No compatible PacketEvents/ProtocolLib mob appearance bridge is active; "
+                    + "Monster Maze mobs will render as their base type.");
         }
         this.mapThemeApplier.start();
         this.soloRunCompletionListener = new SoloRunCompletionListener(this);
