@@ -930,7 +930,6 @@ public final class CameraShyGame implements Listener {
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         player.setInvulnerable(true);
-        player.setCollidable(false);
         player.setAllowFlight(false);
         player.setFlying(false);
         player.getInventory().clear();
@@ -1015,13 +1014,8 @@ public final class CameraShyGame implements Listener {
         }
     }
 
-    private static void disablePlayerCollision(Player player) {
-        if (player == null || !player.isOnline()) return;
-        player.setCollidable(false);
-        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
-            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
-                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
-        }
+    static void disablePlayerCollision(Player player) {
+        ArcadeCollisionRules.disable(player);
     }
 
     private void removeOfflinePlayers() {

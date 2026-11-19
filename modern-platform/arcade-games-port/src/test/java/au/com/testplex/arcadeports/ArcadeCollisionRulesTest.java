@@ -87,6 +87,41 @@ class ArcadeCollisionRulesTest {
                 "all teams on a replacement scoreboard must immediately preserve player pass-through");
     }
 
+    @Test
+    void gameSpecificPassThroughHelpersPreserveNativePlayerHitboxes() {
+        AtomicBoolean playerCollisionFlagTouched = new AtomicBoolean(false);
+        AtomicBoolean teamRuleDisabled = new AtomicBoolean(false);
+        Team team = proxy(Team.class, (method, args) -> {
+            if (method.equals("getOption")) return Team.OptionStatus.ALWAYS;
+            if (method.equals("setOption") && args[0] == Team.Option.COLLISION_RULE) {
+                teamRuleDisabled.set(args[1] == Team.OptionStatus.NEVER);
+            }
+            return null;
+        });
+        Scoreboard scoreboard = proxy(Scoreboard.class, (method, args) -> switch (method) {
+            case "getTeams" -> Set.of(team);
+            case "getEntryTeam" -> team;
+            case "getTeam" -> null;
+            default -> null;
+        });
+        Player player = proxy(Player.class, (method, args) -> switch (method) {
+            case "isOnline" -> true;
+            case "isCollidable", "setCollidable" -> {
+                playerCollisionFlagTouched.set(true);
+                yield false;
+            }
+            case "getScoreboard" -> scoreboard;
+            default -> null;
+        });
+
+        CameraShyGame.disablePlayerCollision(player);
+        SpeedBuildersGame.disablePlayerCollision(player);
+
+        assertFalse(playerCollisionFlagTouched.get(),
+                "game pass-through helpers must not disable the player hitbox used by melee/projectiles");
+        assertTrue(teamRuleDisabled.get(), "game pass-through must still disable scoreboard pushing");
+    }
+
     private static <T> T proxy(Class<T> type, ProxyCall call) {
         return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class) {

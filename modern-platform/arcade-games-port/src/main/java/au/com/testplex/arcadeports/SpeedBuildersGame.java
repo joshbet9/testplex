@@ -522,13 +522,8 @@ public final class SpeedBuildersGame implements Listener {
         if (tick % 20L == 0L) refreshHud();
     }
 
-    private static void disablePlayerCollision(Player player) {
-        if (player == null || !player.isOnline()) return;
-        player.setCollidable(false);
-        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
-            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
-                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
-        }
+    static void disablePlayerCollision(Player player) {
+        ArcadeCollisionRules.disable(player);
     }
 
     private void startMatch(List<Player> participants) {

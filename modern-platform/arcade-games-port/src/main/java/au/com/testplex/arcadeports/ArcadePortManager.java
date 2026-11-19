@@ -3856,7 +3856,6 @@ public final class ArcadePortManager implements Listener {
         player.setFireTicks(0);
         player.setVelocity(new Vector());
         player.setInvulnerable(false);
-        player.setCollidable(false);
         player.setWalkSpeed(0.2F);
         player.setExp(0.0F);
         player.setLevel(0);
@@ -4001,7 +4000,6 @@ public final class ArcadePortManager implements Listener {
         player.setFireTicks(0);
         player.setVelocity(new Vector());
         player.setInvulnerable(false);
-        player.setCollidable(false);
         player.setWalkSpeed(0.2F);
         player.setExp(0.0F);
         player.setLevel(0);
@@ -5899,7 +5897,6 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             player.setInvulnerable(true);
-            player.setCollidable(false);
             player.setWalkSpeed(0.0F);
             if (type == ArcadePortGame.SKY_WARS) {
                 player.setInvulnerable(true);
@@ -14776,7 +14773,6 @@ public final class ArcadePortManager implements Listener {
             for (Player player : session.players.values()) {
                 if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
                 player.setInvulnerable(false);
-                player.setCollidable(false);
                 player.setWalkSpeed(0.2F);
                 if (session.type == ArcadePortGame.DRAGON_ESCAPE
                         && ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(
@@ -15633,9 +15629,8 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
-            // The real player is hidden behind the pig/sheep disguise; disabling collisions
-            // on that hidden body avoids phantom pushes while preserving attack targeting.
-            player.setCollidable(false);
+            // The hidden player retains its native hitbox for projectile targeting; scoreboard
+            // collision rules provide pass-through without changing player entity collision.
             PotionEffect invisible = player.getPotionEffect(PotionEffectType.INVISIBILITY);
             if (invisible == null || invisible.getDuration() < 20) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
