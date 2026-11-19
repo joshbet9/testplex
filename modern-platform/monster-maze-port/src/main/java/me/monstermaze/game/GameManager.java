@@ -84,8 +84,8 @@ public class GameManager implements Listener {
 
     private SafePad safePad;          // active pad
     private SafePad nextSafePad;      // preview pad (spawns at t=2)
-    /** Previous active pad, used to preserve forward course facing when returning a player. */
-    private Location safePadTravelFrom;
+    /** Last recorded yaw/pitch when each player walks off the current Safe Pad. */
+    private final Map<UUID, float[]> padDepartureFacing = new HashMap<UUID, float[]>();
     private final LinkedList<SafePad> oldSafePads = new LinkedList<SafePad>();
 
     private int curSafe = 1;
@@ -311,6 +311,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         spectators.clear();
         playersOnPad.clear();
         padLockIns.clear();
+        padDepartureFacing.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
         safePadNavigation.clear();
@@ -406,7 +407,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     broadcast(ChatColor.AQUA + "Solo mode: survive as long as you can!");
                 }
 
-                safePadTravelFrom = null;
                 spawnSafePad();
                 safePad = nextSafePad;
                 nextSafePad = null;
@@ -545,6 +545,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         feedback.clear();
         safePadNavigation.clear();
         padLockIns.clear();
+        padDepartureFacing.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
         playersOnPad.clear();
@@ -702,10 +703,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
 
             monsterManager.spawnMore(getMode().additionalMonstersPerSafePad());
-            safePadTravelFrom = safePad == null ? null : safePad.getLocation().clone();
             stopSafePad();
             playersOnPad.clear();
             padLockIns.clear();
+        padDepartureFacing.clear();
             photoFinishRivalsThisPhase.clear();
             firstClaimedThisPhase = false;
 
@@ -1043,16 +1044,20 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (player == null || safePad == null || !player.isOnline()) return;
         Location from = player.getLocation();
         Location destination = safePad.getLocation().clone();
-        destination.setYaw(safePadTeleportYaw(from, safePadTravelFrom, destination));
-        destination.setPitch(0.0F);
+        float[] facing = safePadTeleportFacing(from, padDepartureFacing.get(player.getUniqueId()));
+        destination.setYaw(facing[0]);
+        destination.setPitch(facing[1]);
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0, 0, 0));
         player.teleport(destination);
     }
 
-    /** Preserve course-forward facing when the player is teleported back from beyond the new pad. */
-    static float safePadTeleportYaw(Location playerLocation, Location previousSafePad, Location target) {
-        return yawToward(previousSafePad == null ? playerLocation : previousSafePad, target);
+    /** Return the actual view direction when this player left the pad, not a shared travel vector. */
+    static float[] safePadTeleportFacing(Location playerLocation, float[] departureFacing) {
+        if (departureFacing != null && departureFacing.length == 2) return departureFacing.clone();
+        return playerLocation == null
+                ? new float[] {0.0F, 0.0F}
+                : new float[] {playerLocation.getYaw(), playerLocation.getPitch()};
     }
 
     /** Calculate the horizontal Minecraft yaw needed to face from one point toward another. */
@@ -1233,6 +1238,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         UUID id = player.getUniqueId();
         scoreboard.clear(Collections.singletonList(player));
         padLockIns.remove(id);
+        padDepartureFacing.remove(id);
         lastExpBarStates.remove(id);
         lastCompassTargets.remove(id);
         
@@ -1294,6 +1300,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
         Player p = event.getPlayer();
         if (!alive.contains(p.getUniqueId())) return;
         if (center == null) return;
+
+        // Remember each individual player\'s facing at the moment they walk off the pad.
+        // The previous-pad -> current-pad vector is not the direction the player left it.
+        Location destination = event.getTo();
+        if (safePad != null && padLockIns.contains(p.getUniqueId()) && destination != null
+                && safePad.isOn(event.getFrom()) && !safePad.isOn(destination)) {
+            padDepartureFacing.put(p.getUniqueId(),
+                    new float[] {destination.getYaw(), destination.getPitch()});
+        }
 
         if (p.getLocation().getY() < center.getY() - 3) {
             if (padLockIns.contains(p.getUniqueId()) && safePad != null) {
