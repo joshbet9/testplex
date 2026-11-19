@@ -1311,7 +1311,9 @@ public final class PlexballGame implements Listener {
             lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "SPECTATING");
             lines.add(ChatColor.WHITE + "Time left: " + formatMatchTime());
             lines.add(ChatColor.YELLOW + "At bat: "
-                    + (currentBatter == null ? "—" : currentBatter.getName()));
+                    + (currentBatter == null ? "—"
+                    : ArcadeScoreboardNameRules.format(viewer.getUniqueId(), currentBatter.getUniqueId(),
+                            currentBatter.getName(), ChatColor.WHITE)));
             lines.add(ChatColor.GRAY + "Players: " + matchPlayers.size()
                     + "  |  viewers: " + spectatorPlayers().size());
             lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "TOP DISTANCES");
@@ -1327,7 +1329,9 @@ public final class PlexballGame implements Listener {
                 Player leader = Bukkit.getPlayer(id);
                 PlayerResult result = results.getOrDefault(id, new PlayerResult());
                 lines.add(ChatColor.YELLOW + Integer.toString(rank++) + ". "
-                        + (leader == null ? "Offline" : leader.getName()) + " "
+                        + (leader == null ? "Offline"
+                                : ArcadeScoreboardNameRules.format(viewer.getUniqueId(), leader.getUniqueId(),
+                                        leader.getName(), ChatColor.WHITE)) + " "
                         + formatDistance(result.bestDistance));
             }
             lines.add(ChatColor.GREEN + "100m = HOME RUN");
@@ -1348,7 +1352,10 @@ public final class PlexballGame implements Listener {
             String batterName = currentBatter == null
                     ? (phase == Phase.TURN_BREAK ? "Round result" : "—")
                     : currentBatter.getName();
-            lines.add(ChatColor.YELLOW + batterLabel + batterName);
+            String formattedBatter = currentBatter == null ? batterName
+                    : ArcadeScoreboardNameRules.format(viewer.getUniqueId(), currentBatter.getUniqueId(),
+                            batterName, ChatColor.WHITE);
+            lines.add(ChatColor.YELLOW + batterLabel + formattedBatter);
             String roleInstruction;
             if (phase == Phase.INTRO) {
                 roleInstruction = "Get ready; follow your title cue";
@@ -1385,7 +1392,9 @@ public final class PlexballGame implements Listener {
                 Player leader = Bukkit.getPlayer(id);
                 PlayerResult result = results.getOrDefault(id, new PlayerResult());
                 lines.add(ChatColor.YELLOW + Integer.toString(rank++) + ". "
-                        + (leader == null ? "Offline" : leader.getName()) + " "
+                        + (leader == null ? "Offline"
+                                : ArcadeScoreboardNameRules.format(viewer.getUniqueId(), leader.getUniqueId(),
+                                        leader.getName(), ChatColor.WHITE)) + " "
                         + formatDistance(result.bestDistance));
             }
             lines.add(ChatColor.GREEN + "100m = HOME RUN");

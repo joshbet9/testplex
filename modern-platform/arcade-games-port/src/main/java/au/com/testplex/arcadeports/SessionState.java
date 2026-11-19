@@ -55,6 +55,36 @@ class SessionState {
         }
     }
 
+    static final class SharedMatchScoreboardView {
+        final Scoreboard scoreboard;
+        final Objective objective;
+        final List<Team> lines;
+        final List<String> entries;
+
+        SharedMatchScoreboardView(Scoreboard scoreboard, Objective objective,
+                List<Team> lines, List<String> entries) {
+            this.scoreboard = scoreboard;
+            this.objective = objective;
+            this.lines = lines;
+            this.entries = entries;
+        }
+    }
+
+    static final class SidebarScoreboardView {
+        final Scoreboard scoreboard;
+        final Objective objective;
+        final List<Team> lines;
+        final List<String> entries;
+
+        SidebarScoreboardView(Scoreboard scoreboard, Objective objective,
+                List<Team> lines, List<String> entries) {
+            this.scoreboard = scoreboard;
+            this.objective = objective;
+            this.lines = lines;
+            this.entries = entries;
+        }
+    }
+
     final Map<Block, Long> evolutionWebs = new HashMap<>();
     SuperSploorEngine superSploorEngine;
     Map<UUID, SuperSploorRuntime.PlayerMatchStats> superSploorPlayerStats = Map.of();
@@ -118,22 +148,15 @@ class SessionState {
     long masterBuilderVoteEndsAt;
     long masterBuilderReviewEndsAt;
     int masterBuilderReviewIndex;
-    Scoreboard masterBuildersScoreboard;
-    Objective masterBuildersScoreboardObjective;
-    final List<String> masterBuildersScoreboardEntries = new ArrayList<>();
+    final Map<UUID, SidebarScoreboardView> masterBuildersScoreboards = new HashMap<>();
     long masterBuildersNextScoreboardAt;
-    Scoreboard sharedMatchScoreboard;
-    Objective sharedMatchScoreboardObjective;
-    final List<String> bombLobbersScoreboardEntries = new ArrayList<>();
-    final List<Team> sharedMatchScoreboardTeams = new ArrayList<>();
-    final List<String> sharedMatchScoreboardEntries = new ArrayList<>();
+    final Map<UUID, SharedMatchScoreboardView> sharedMatchScoreboards = new HashMap<>();
+    final Map<UUID, SidebarScoreboardView> bombLobbersScoreboards = new HashMap<>();
     long sharedMatchNextScoreboardAt;
     final Map<UUID, EvolutionScoreboardView> evolutionScoreboards = new HashMap<>();
     long evolutionNextScoreboardAt;
     final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
-    Scoreboard paintballScoreboard;
-    Objective paintballScoreboardObjective;
-    final List<String> paintballScoreboardEntries = new ArrayList<>();
+    final Map<UUID, SidebarScoreboardView> paintballScoreboards = new HashMap<>();
     long paintballNextScoreboardAt;
     final Map<UUID, String> paintballKits = new HashMap<>();
     final Map<UUID, Integer> paintProjectileTeams = new HashMap<>();
@@ -421,13 +444,9 @@ class SessionState {
     final Map<UUID, Long> baconBlastCreatedAt = new HashMap<>();
     final Map<UUID, UUID> baconLastDamager = new HashMap<>();
     final Map<UUID, Long> baconLastDamagedAt = new HashMap<>();
-    Scoreboard baconDisguiseScoreboard;
-    Team baconDisguiseTeam;
-    Scoreboard baconMeterScoreboard;
-    Objective baconMeterObjective;
-    Objective baconPreviousSidebar;
-    final List<Team> baconMeterTeams = new ArrayList<>();
-    final List<String> baconMeterEntries = new ArrayList<>();
+    final Map<UUID, Scoreboard> baconDisguiseScoreboards = new HashMap<>();
+    final Map<UUID, Team> baconDisguiseTeams = new HashMap<>();
+    final Map<UUID, SidebarScoreboardView> baconMeterScoreboards = new HashMap<>();
     final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
     final Map<UUID, String> baconNameEntries = new HashMap<>();
     final Map<UUID, Set<UUID>> baconHiddenViewersByOwner = new HashMap<>();
@@ -478,12 +497,6 @@ class SessionState {
     final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
     final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
     final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
-    Scoreboard bombLobbersScoreboard;
-    Objective bombLobbersScoreboardObjective;
-    Team bombRedScoreboardLine;
-    Team bombBlueScoreboardLine;
-    String bombRedScoreboardEntry;
-    String bombBlueScoreboardEntry;
     final Map<UUID, String> bombPowerTypes = new HashMap<>();
     final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
     long bombNextPowerupSpawnAt;
