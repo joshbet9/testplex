@@ -16,5 +16,11 @@ class GameScoreboardKitNametagTest {
         assertTrue(a.length() <= 16);
         assertNotEquals(a, b);
         assertEquals(a, GameScoreboard.kitNametagTeamName(first));
+
+        // Fake/test players may have identical UUID prefixes but different tails.
+        UUID botA = UUID.fromString("00000000-0000-4000-8000-000000000101");
+        UUID botB = UUID.fromString("00000000-0000-4000-8000-000000000102");
+        assertNotEquals(GameScoreboard.kitNametagTeamName(botA),
+                GameScoreboard.kitNametagTeamName(botB));
     }
 }
