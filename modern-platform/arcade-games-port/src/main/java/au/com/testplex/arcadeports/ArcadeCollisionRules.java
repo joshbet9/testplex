@@ -1,5 +1,7 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.World;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
@@ -7,6 +9,25 @@ import org.bukkit.scoreboard.Team;
 /** Shared Mineplex 1.8 player pass-through behavior for active arcade matches. */
 public final class ArcadeCollisionRules {
     private ArcadeCollisionRules() {
+    }
+
+    /**
+     * Removes physical entity pushing for server-controlled mobs while preserving
+     * their hitboxes and all event-based attacks/interactions. Player pass-through
+     * remains governed by scoreboard collision rules.
+     */
+    public static boolean disableMobCollision(LivingEntity entity) {
+        if (entity == null || entity instanceof Player) return false;
+        if (entity.isCollidable()) entity.setCollidable(false);
+        return true;
+    }
+
+    /** Normalize mobs already loaded before the plugin registered its spawn listener. */
+    public static void disableExistingMobCollisions(World world) {
+        if (world == null) return;
+        for (LivingEntity entity : world.getLivingEntities()) {
+            disableMobCollision(entity);
+        }
     }
 
     /** Assigns a game or lobby scoreboard and immediately reapplies pass-through. */
