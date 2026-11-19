@@ -15,6 +15,11 @@ final class ArcadeLobbyLifecycleRules {
     /** Gameplay input is not accepted until the session's Prepare phase has ended. */
     static boolean gameplayInputAllowed(boolean liveStarted) { return liveStarted; }
 
+    /** Monster Maze has its own 3-second STARTING phase: walking is allowed, but gameplay input remains locked. */
+    static boolean allowPrepareMovement(ArcadePortGame game, String modulePhase) {
+        return game != null && game.isMonsterMaze() && "STARTING".equals(modulePhase);
+    }
+
     /** Move an absolute game timestamp forward by time spent in the Prepare phase. */
     static long shiftPausedTimestamp(long timestamp, long pausedMillis) {
         if (timestamp <= 0L || pausedMillis <= 0L) return timestamp;

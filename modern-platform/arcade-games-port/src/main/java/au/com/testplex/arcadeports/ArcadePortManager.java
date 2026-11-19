@@ -27903,6 +27903,9 @@ public final class ArcadePortManager implements Listener {
         UUID playerId = player.getUniqueId();
         if (!session.players.containsKey(playerId) || event.getTo() == null) return;
         if (!session.liveStarted) {
+            // Embedded Monster Maze owns its 3-second countdown. Players must be able to
+            // walk across the starting floor while jumps and gameplay inputs remain locked.
+            if (ArcadeLobbyLifecycleRules.allowPrepareMovement(session.type, session.modulePhase)) return;
             // Do not cancel the initial spawn teleports while setup is running.
             // After setup completes, freeze position until the round enters Live.
             if (session.startupComplete) {
