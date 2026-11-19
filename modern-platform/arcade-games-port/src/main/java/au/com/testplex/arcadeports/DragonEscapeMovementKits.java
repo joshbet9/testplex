@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
@@ -114,6 +115,7 @@ final class DragonEscapeMovementKits {
         boolean gravityManaged;
         boolean gravityBeforeCling;
         double clingHeight;
+        Location clingAnchor;
         double charge = 1.0D;
 
         // An airborne chain is unrestricted; cooldown starts ONLY after landing.
@@ -195,6 +197,7 @@ final class DragonEscapeMovementKits {
 
         void cancelWallClingForKick() {
             clingActive = false;
+            clingAnchor = null;
             crouchConsumed = true;
         }
     }
@@ -238,6 +241,20 @@ final class DragonEscapeMovementKits {
     static double acrobatFallDamage(String kit, double vanillaFallDamage) {
         return "acrobat".equals(kit) ? vanillaFallDamage * ACROBAT_FALL_DAMAGE_MULTIPLIER
                 : vanillaFallDamage;
+    }
+
+    /**
+     * Cling is a full position latch, not just a fixed Y coordinate. Movement
+     * keys must never walk the player off a wall; only mouse look changes while
+     * latched. A fresh Space press is handled separately by wallKickVelocity.
+     */
+    static Location wallClingDestination(Location attempted, Location anchor) {
+        if (attempted == null || anchor == null || attempted.getWorld() != anchor.getWorld())
+            return attempted;
+        Location pinned = anchor.clone();
+        pinned.setYaw(attempted.getYaw());
+        pinned.setPitch(attempted.getPitch());
+        return pinned;
     }
 
     static Vector wallClingVelocity() {
