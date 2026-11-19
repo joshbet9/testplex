@@ -10,6 +10,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BaconBrawlAchievementTrackerTest {
     @Test
+    void wellDoneRequiresWinningEligibleCountAndEveryCreditedKillToBeCritical() {
+        BaconBrawlAchievementTracker tracker = new BaconBrawlAchievementTracker();
+        UUID player = UUID.randomUUID();
+
+        tracker.recordCreditedKill(player, true);
+        tracker.recordCreditedKill(player, true);
+        assertFalse(tracker.qualifiesWellDone(player));
+
+        tracker.recordCreditedKill(player, true);
+        assertTrue(tracker.qualifiesWellDone(player));
+
+        tracker.recordCreditedKill(player, false);
+        assertFalse(tracker.qualifiesWellDone(player));
+    }
+
+    @Test
     void ironHogRequiresEightRealBlockedHitsAndRejectsSpam() {
         BaconBrawlAchievementTracker tracker = new BaconBrawlAchievementTracker();
         UUID brutus = UUID.randomUUID();

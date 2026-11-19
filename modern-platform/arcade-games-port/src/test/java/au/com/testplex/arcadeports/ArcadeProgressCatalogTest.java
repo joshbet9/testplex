@@ -191,7 +191,7 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("dragons", "dodgems", "Dodgems"));
         assertTrue(hasAchievement("dragons", "sticks-and-stones", "Sticks and stones"));
         assertTrue(hasAchievement("dragons", "mlg-pro", "MLG Pro"));
-        assertTrue(hasAchievement("dragons", "dragon-tamer", "Dragon Tamer"));
+        assertTrue(hasAchievement("dragons", "dragon-tamer", "Snow Patrol"));
         assertTrue(hasAchievement("dragons", "bridge-over-troubled-void", "Bridge Over Troubled Void"));
         assertTrue(hasAchievement("dragons", "wing-it-to-win-it", "Wing It to Win It"));
         assertTrue(hasAchievement("dragons", "dragon-whisperer", "Dragon Whisperer"));
@@ -212,6 +212,15 @@ class ArcadeProgressCatalogTest {
         assertFalse(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(1));
         assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(2));
         assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(3));
+    }
+
+    @Test
+    void closeShaveRequiresAWinningFinalTntDuelAtOneHeartEach() {
+        assertFalse(BombLobbersAchievement.closeShave(false, 2.0D, 2.0D));
+        assertFalse(BombLobbersAchievement.closeShave(true, 2.01D, 2.0D));
+        assertFalse(BombLobbersAchievement.closeShave(true, 2.0D, 2.01D));
+        assertTrue(BombLobbersAchievement.closeShave(true, 2.0D, 2.0D));
+        assertTrue(BombLobbersAchievement.closeShave(true, 1.0D, 1.5D));
     }
 
     @Test void bombLobbersHasFourteenAchievementsWithOneForEveryKit() {
@@ -267,18 +276,16 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("snake", "last-coil-standing", "Last Coil Standing"));
         assertEquals(14, ArcadeProgressCatalog.achievements("snake").size());
         assertTrue(hasAchievement("spleef", "no-mods-in-here", "No Mods in Here"));
-        assertTrue(hasAchievement("spleef", "spleef-king-or-queen", "Spleef King (or Queen)"));
-        assertTrue(hasAchievement("spleef", "demolitionist", "Demolitionist"));
+        assertTrue(hasAchievement("spleef", "spleef-king-or-queen", "One Square at a Time"));
+        assertTrue(hasAchievement("spleef", "demolitionist", "Sinkhole"));
         assertEquals(14, ArcadeProgressCatalog.achievements("spleef").size());
         assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
-        assertTrue(hasAchievement("turf-wars", "turf-master-3000", "Turf Master 3000"));
+        assertTrue(hasAchievement("turf-wars", "turf-master-3000", "Bank Shot Finale"));
         assertEquals(15, ArcadeProgressCatalog.achievements("turf-wars").size());
     }
 
     @Test
     void spleefAchievementPredicatesRequireTheExactWinAndFinalKillConditions() {
-        assertEquals(15, SpleefAchievementRules.KING_OR_QUEEN_WINS);
-        assertEquals(20_000, SpleefAchievementRules.DEMOLITIONIST_BLOCKS);
         assertTrue(SpleefAchievementRules.finalEliminationsMatch(List.of(false, true, true, true), 3));
         assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, false, true), 3));
         assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, true), 3));
@@ -292,7 +299,9 @@ class ArcadeProgressCatalogTest {
 
     @Test
     void turfWarsAchievementPredicatesUseTheApprovedThresholdsAndWinRequirements() {
-        assertEquals(50, TurfWarsAchievementRules.TURF_MASTER_WINS);
+        assertTrue(TurfWarsAchievementRules.bankShotFinale(true, true));
+        assertFalse(TurfWarsAchievementRules.bankShotFinale(true, false));
+        assertFalse(TurfWarsAchievementRules.bankShotFinale(false, true));
         assertEquals(2_000, TurfWarsAchievementRules.SHREDDINATOR_BLOCKS);
         assertTrue(TurfWarsAchievementRules.deadCentre("marksman", true, 20));
         assertFalse(TurfWarsAchievementRules.deadCentre("marksman", true, 19));
@@ -369,10 +378,10 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("skywars", "death-bomber", "Master Bomber"));
         assertTrue(hasAchievement("skywars", "no-chest", "Survivalist"));
         assertTrue(hasAchievement("skywars", "no-armor", "Bare Minimum"));
-        assertTrue(hasAchievement("skywars", "sky-king", "Sky King"));
+        assertTrue(hasAchievement("skywars", "sky-king", "Last Heart in the Sky"));
         assertTrue(hasAchievement("skywars", "tnt-hoarder", "TNT Hoarder"));
         assertTrue(hasAchievement("skywars", "left-for-dead", "Left for Dead"));
-        assertTrue(hasAchievement("skywars", "cold-blooded-killer", "Cold Blooded Killer"));
+        assertTrue(hasAchievement("skywars", "cold-blooded-killer", "Gravity's Accountant"));
         assertTrue(hasAchievement("skywars", "second-chance", "Second Chance"));
         assertTrue(hasAchievement("skywars", "fire-sale", "Fire Sale"));
         assertTrue(hasAchievement("skywars", "bridge-the-gap", "Bridge the Gap"));
@@ -493,7 +502,7 @@ class ArcadeProgressCatalogTest {
         var wizards = ArcadeProgressCatalog.achievements("wizards");
         assertEquals(14, wizards.size());
         assertEquals(14, wizards.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
-        assertEquals("Win 15 games of Wizards.", wizards.stream()
+        assertEquals("Win after surviving an opponent's spell at 1 heart or less, then eliminating that same opponent with a spell.", wizards.stream()
                 .filter(achievement -> achievement.id().equals("supreme-wizard"))
                 .findFirst().orElseThrow().requirement());
         for (String id : List.of("youre-a-wizard-harry", "strong-willed-small-minded", "ding-dong",

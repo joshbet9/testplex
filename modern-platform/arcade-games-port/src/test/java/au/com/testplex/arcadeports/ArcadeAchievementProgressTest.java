@@ -6,13 +6,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeAchievementProgressTest {
     @Test void supportedProgressIsBoundToThePersistedMetricAndActualThreshold() {
-        var masterBomber = ArcadeAchievementProgress.counter("bomb-lobbers", "master-bomber");
-        assertNotNull(masterBomber);
-        assertEquals("wins", masterBomber.statKey());
-        assertEquals(30, masterBomber.target());
+        assertNull(ArcadeAchievementProgress.counter("bomb-lobbers", "master-bomber"));
+        assertNull(ArcadeAchievementProgress.counter("dragon-escape", "douglas-defeater"));
+        assertNull(ArcadeAchievementProgress.counter("sheep-quest", "hungry-hungry-hippo"));
         assertEquals("map-wins.through-hell",
                 ArcadeAchievementProgress.counter("dragon-escape", "to-hell-and-back").statKey());
-        assertEquals(20, ArcadeAchievementProgress.counter("sheep-quest", "hungry-hungry-hippo").target());
         assertEquals(100, ArcadeAchievementProgress.counter("sheep-quest", "thief").target());
         assertEquals(100, ArcadeAchievementProgress.counter("sheep-quest", "animal-rescue").target());
     }
@@ -20,6 +18,7 @@ class ArcadeAchievementProgressTest {
     @Test void OneMatchChallengesCannotBeFakedFromLifetimeTotals() {
         assertNull(ArcadeAchievementProgress.counter("bomb-lobbers", "ultimate-killer"));
         assertNull(ArcadeAchievementProgress.counter("camera-shy", "double-elimination"));
+        assertNull(ArcadeAchievementProgress.counter("bacon-brawl", "king-of-bacon"));
     }
 
     @Test void removedEvolutionAchievementsDoNotExposeObsoleteLifetimeProgress() {

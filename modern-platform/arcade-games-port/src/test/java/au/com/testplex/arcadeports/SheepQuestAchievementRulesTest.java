@@ -7,6 +7,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SheepQuestAchievementRulesTest {
+    @Test void wageWarNeedsAStolenCaptureFromEachOpposingPen() {
+        assertTrue(SheepQuestAchievementRules.wageWar(0, java.util.Set.of(1, 2, 3)));
+        assertFalse(SheepQuestAchievementRules.wageWar(0, java.util.Set.of(1, 2)));
+        assertTrue(SheepQuestAchievementRules.wageWar(0, java.util.Set.of(0, 1, 2, 3)));
+        assertFalse(SheepQuestAchievementRules.wageWar(4, java.util.Set.of(0, 1, 2, 3)));
+    }
+
     @Test void cheekyRequiresFiveCapturesInsideFinalTenSecondsAndWinning() {
         long endedAt = 100_000L;
         assertTrue(SheepQuestAchievementRules.cheeky(true,

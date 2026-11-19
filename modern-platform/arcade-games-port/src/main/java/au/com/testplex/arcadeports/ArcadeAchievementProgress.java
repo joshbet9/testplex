@@ -15,17 +15,13 @@ final class ArcadeAchievementProgress {
     }
 
     private static final Map<String, Counter> COUNTERS = Map.ofEntries(
-            entry("bacon-brawl", "king-of-bacon", "wins", 15, "wins"),
-            entry("bomb-lobbers", "master-bomber", "wins", 30, "wins"),
             entry("death-tag", "death-proof", "wins", 50, "wins"),
             entry("death-tag", "catch-me-if-you-can", "run-distance", 10_000, "blocks"),
             entry("death-tag", "resilient-runner", "basher-hearts-regenerated", 250, "hearts"),
-            entry("dragon-escape", "douglas-defeater", "wins", 50, "wins"),
             entry("dragon-escape", "skylands-master", "map-wins.skylands", 5, "finishes"),
             entry("dragon-escape", "to-hell-and-back", "map-wins.through-hell", 5, "finishes"),
             entry("dragon-escape", "plundered", "map-wins.pirate-bay", 5, "finishes"),
             entry("dragons", "win-three-in-a-row", "win-streak", 3, "consecutive wins"),
-            entry("sheep-quest", "hungry-hungry-hippo", "wins", 20, "wins"),
             entry("sheep-quest", "thief", "thief", 100, "sheep"),
             entry("sheep-quest", "animal-rescue", "animal-rescue", 100, "rescues")
     );

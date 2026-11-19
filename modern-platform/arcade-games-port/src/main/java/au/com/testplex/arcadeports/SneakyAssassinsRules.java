@@ -52,7 +52,6 @@ final class SneakyAssassinsRules {
     public static final int NPC_SPAWN_SEARCH_ATTEMPTS = 80;
     public static final int PROSECUTOR_DISTINCT_TARGETS_REQUIRED = 5;
     public static final int DUELS_OTHER_MASTERS_REQUIRED = 2;
-    public static final int SO_SO_SNEAKY_WINS_REQUIRED = 15;
     public static final int MASTER_ASSASSIN_ACHIEVEMENTS_REQUIRED = 10;
     public static final int INCOMPETENCE_NPCS_REQUIRED = 200;
     public static final int I_SEE_YOU_REVEALS_REQUIRED = 50;
@@ -107,6 +106,10 @@ final class SneakyAssassinsRules {
 
     static boolean shouldAwardPaidInFull(boolean winner, boolean finalEliminationByBribedVillager) {
         return winner && finalEliminationByBribedVillager;
+    }
+
+    static boolean noWitnesses(boolean winner, double minimumHealth) {
+        return winner && Double.isFinite(minimumHealth) && minimumHealth >= 15.0D;
     }
 
     static String achievementForLifetimeStat(String stat, int value) {

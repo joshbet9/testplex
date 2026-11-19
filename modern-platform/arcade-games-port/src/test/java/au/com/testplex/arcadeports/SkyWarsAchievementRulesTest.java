@@ -7,12 +7,24 @@ import org.junit.jupiter.api.Test;
 
 class SkyWarsAchievementRulesTest {
     @Test void sourceAchievementThresholdsMatchTheMineplexCatalogue() {
-        assertEquals(20, SkyWarsAchievementRules.SKY_KING_WINS);
         assertEquals(100, SkyWarsAchievementRules.TNT_HOARDER_PICKUPS);
         assertEquals(120, SkyWarsAchievementRules.LEFT_FOR_DEAD_ZOMBIES);
-        assertEquals(80, SkyWarsAchievementRules.COLD_BLOODED_KILLS);
         assertFalse(SkyWarsAchievementRules.reached(99, 100));
         assertTrue(SkyWarsAchievementRules.reached(100, 100));
+    }
+
+    @Test void replacementChallengesUseTheExactFinalDuelAndFallRequirements() {
+        assertFalse(SkyWarsAchievementRules.lastHeartInTheSky(false, 2.0D));
+        assertFalse(SkyWarsAchievementRules.lastHeartInTheSky(true, 2.01D));
+        assertTrue(SkyWarsAchievementRules.lastHeartInTheSky(true, 2.0D));
+        assertFalse(SkyWarsAchievementRules.gravityAccountantFall(39.99D));
+        assertTrue(SkyWarsAchievementRules.gravityAccountantFall(40.0D));
+
+        SkyWarsAchievementRules.MatchTracker tracker = new SkyWarsAchievementRules.MatchTracker();
+        tracker.recordLastHeartInTheSky(true, 2.0D);
+        tracker.recordGravityAccountantElimination(40.0D);
+        assertTrue(tracker.lastHeartInTheSky());
+        assertTrue(tracker.gravityAccountant());
     }
 
     @Test void abilityChallengesRequireTheApprovedMatchConditions() {

@@ -18,6 +18,16 @@ class DragonsAchievementRulesTest {
     }
 
     @Test
+    void snowPatrolRequiresASeparateLivingPlayerToRecoverFromAFallOnFrostIce() {
+        java.util.UUID frost = java.util.UUID.randomUUID();
+        java.util.UUID rescuer = java.util.UUID.randomUUID();
+        assertFalse(DragonsAchievementRules.snowPatrolRescue(frost, frost, 8.0D, true));
+        assertFalse(DragonsAchievementRules.snowPatrolRescue(frost, rescuer, 2.99D, true));
+        assertFalse(DragonsAchievementRules.snowPatrolRescue(frost, rescuer, 5.0D, false));
+        assertTrue(DragonsAchievementRules.snowPatrolRescue(frost, rescuer, 3.0D, true));
+    }
+
+    @Test
     void tamerCreditRequiresItsControlledDragonAndFallOrVoidEliminationWithinTenSeconds() {
         assertTrue(DragonsAchievementRules.tamerFallElimination(true, "fell into the void", 10_000L));
         assertFalse(DragonsAchievementRules.tamerFallElimination(false, "fell into the void", 1_000L));

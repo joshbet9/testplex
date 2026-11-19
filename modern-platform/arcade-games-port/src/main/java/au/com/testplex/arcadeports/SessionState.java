@@ -268,6 +268,7 @@ class SessionState {
     final Map<Integer, Integer> gladiatorRoundCountdownShownByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorRoundStartedAtByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorNextPoisonAtByPair = new HashMap<>();
+    final Map<UUID, Integer> gladiatorPoisonKills = new HashMap<>();
     final Map<UUID, UUID> gladiatorArrowOwners = new HashMap<>();
     final Map<UUID, Integer> gladiatorArrowsShot = new HashMap<>();
     final Map<UUID, Integer> gladiatorArrowsHit = new HashMap<>();
@@ -426,6 +427,7 @@ class SessionState {
     final Map<UUID, Long> baconCrispyFlamedUntil = new HashMap<>();
     final Map<UUID, Long> baconHitFeedbackUntil = new HashMap<>();
     final Map<UUID, String> baconLastHitSource = new HashMap<>();
+    final Map<UUID, Boolean> baconLastHitCritical = new HashMap<>();
     final Map<UUID, Boolean> baconLastHitBackstab = new HashMap<>();
     final Map<UUID, Boolean> baconLastHitCloaked = new HashMap<>();
     final Map<UUID, Integer> baconBlastKills = new HashMap<>();
@@ -470,6 +472,7 @@ class SessionState {
     final Map<UUID, Integer> sheepQuestLeapCaptures = new HashMap<>();
     final Map<UUID, Integer> sheepQuestNonLeapCaptures = new HashMap<>();
     final Map<UUID, Integer> sheepQuestCaptures = new HashMap<>();
+    final Map<UUID, Set<Integer>> sheepQuestCapturedFromPenTeams = new HashMap<>();
     final Map<UUID, Map<Integer, Integer>> sheepQuestSoloCarryCaptures = new HashMap<>();
     final Map<UUID, List<Long>> sheepQuestCaptureTimes = new HashMap<>();
     final Map<UUID, Integer> sheepQuestKills = new HashMap<>();
@@ -528,6 +531,7 @@ class SessionState {
     final Map<UUID, Integer> bombWonderkidImpactKills = new HashMap<>();
     final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
     final Set<UUID> bombMvpPressurePlayers = new HashSet<>();
+    final Set<UUID> bombCloseShaveCandidates = new HashSet<>();
     final Set<UUID> bombPlayersDamaged = new HashSet<>();
     final Map<UUID, Map<UUID, Long>> bombDamageContributors = new HashMap<>();
     final Map<UUID, Integer> bombAssists = new HashMap<>();
@@ -583,6 +587,8 @@ class SessionState {
     final Map<UUID, Long> spleefGustReadyAt = new HashMap<>();
     final Map<String, Long> spleefKnockbackAt = new HashMap<>();
     final Map<UUID, Integer> spleefBlocksBroken = new HashMap<>();
+    final Map<UUID, Integer> spleefCreditedEliminations = new HashMap<>();
+    final Map<UUID, Set<SpleefAchievementRules.BlockPosition>> spleefBrokenPositions = new HashMap<>();
     final Map<UUID, Long> spleefSpectateNextTeleportAt = new HashMap<>();
     long spleefNextCompassUpdateAt;
     final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
@@ -602,6 +608,9 @@ class SessionState {
     final Map<UUID, UUID> turfBarrageArrowOwners = new HashMap<>();
     final Map<UUID, Set<UUID>> turfBarrageTargetsByOwner = new HashMap<>();
     final Map<UUID, UUID> turfBounceArrowOwners = new HashMap<>();
+    final Map<UUID, UUID> turfBounceHitByTarget = new HashMap<>();
+    final Map<UUID, Long> turfBounceHitAt = new HashMap<>();
+    final Set<UUID> turfFinalBounceKillers = new HashSet<>();
     final Map<UUID, Long> turfBounceLaunchUntil = new HashMap<>();
     final Set<UUID> turf360BounceArrows = new HashSet<>();
     final Map<UUID, Integer> turfBounceShotStreak = new HashMap<>();
@@ -674,6 +683,8 @@ class SessionState {
     final Map<String, Long> dragonContactCooldowns = new HashMap<>();
     final Map<Block, BlockData> dragonIceBridgeOriginals = new HashMap<>();
     final Map<Block, Long> dragonIceBridgeExpiresAt = new HashMap<>();
+    final Map<Block, UUID> dragonIceBridgeOwners = new HashMap<>();
+    final Set<UUID> dragonSnowPatrolCandidates = new HashSet<>();
     final Map<UUID, List<Block>> dragonFrostBridgePaths = new HashMap<>();
     final Map<UUID, Integer> dragonFrostBridgePathIndexes = new HashMap<>();
     final Map<UUID, List<Block>> dragonFrostVoidChallengePaths = new HashMap<>();

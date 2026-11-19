@@ -1,10 +1,19 @@
 package au.com.testplex.arcadeports;
 
 import java.util.List;
+import java.util.Set;
 
 /** Pure end-of-match predicates for Sheep Quest challenge awards. */
 final class SheepQuestAchievementRules {
     private SheepQuestAchievementRules() { }
+
+    static boolean wageWar(int playerTeam, Set<Integer> capturedPenTeams) {
+        if (playerTeam < 0 || playerTeam > 3 || capturedPenTeams == null) return false;
+        for (int team = 0; team < 4; team++) {
+            if (team != playerTeam && !capturedPenTeams.contains(team)) return false;
+        }
+        return true;
+    }
 
     static boolean cheeky(boolean won, List<Long> captureTimes, long completedAtMillis) {
         if (!won || captureTimes == null || completedAtMillis <= 0L) return false;

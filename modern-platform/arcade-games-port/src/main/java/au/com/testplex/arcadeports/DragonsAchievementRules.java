@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Small, deterministic conditions used by Dragons' live achievement detectors. */
 final class DragonsAchievementRules {
@@ -9,6 +10,11 @@ final class DragonsAchievementRules {
     private static final double VERTICAL_DRAG = 0.98D;
 
     private DragonsAchievementRules() { }
+
+    static boolean snowPatrolRescue(UUID frostOwner, UUID bridgeUser, double fallDistance, boolean stillAlive) {
+        return frostOwner != null && bridgeUser != null && !frostOwner.equals(bridgeUser)
+                && Double.isFinite(fallDistance) && fallDistance >= 3.0D && stillAlive;
+    }
 
     static boolean gliderDistanceReached(double horizontalDistance, boolean landed) {
         return !landed && Double.isFinite(horizontalDistance) && horizontalDistance >= 25.0D;

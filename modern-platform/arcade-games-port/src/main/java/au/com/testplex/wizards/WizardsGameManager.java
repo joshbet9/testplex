@@ -125,6 +125,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private final Map<Location, TemporaryBlock> temporaryBlocks = new HashMap<>();
     private final Set<UUID> ownedEntities = new HashSet<>();
     private final Set<UUID> spellDamageSources = new HashSet<>();
+    private final Map<UUID, UUID> spellKillAttribution = new HashMap<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
@@ -1597,10 +1598,22 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (caster == null || !caster.isOnline()) {
                 victim.damage(damage);
             } else {
+                if (victim instanceof Player target && !target.getUniqueId().equals(casterId)) {
+                    spellKillAttribution.put(target.getUniqueId(), casterId);
+                }
                 spellDamageSources.add(casterId);
                 victim.damage(damage, caster);
+                if (victim instanceof Player target && target.isOnline() && !target.isDead()
+                        && target.getHealth() < before && target.getHealth() <= 2.0D) {
+                    WizardState targetState = states.get(target.getUniqueId());
+                    if (targetState != null && targetState.alive) {
+                        targetState.manaReversalCasters.add(casterId);
+                        targetState.manaReversalSurvivor = true;
+                    }
+                }
             }
         } finally {
+            if (victim instanceof Player target) spellKillAttribution.remove(target.getUniqueId());
             if (casterId != null) {
                 spellDamageSources.remove(casterId);
             }
@@ -1935,6 +1948,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (wolfData != null) killer = Bukkit.getPlayer(wolfData.owner);
         }
         WizardState killerState = killer == null ? null : states.get(killer.getUniqueId());
+        UUID spellCaster = spellKillAttribution.remove(player.getUniqueId());
+        if (killerState != null && killer != null && killer.getUniqueId().equals(spellCaster)
+                && killerState.manaReversalCasters.remove(player.getUniqueId())) {
+            killerState.manaReversalElimination = true;
+        }
         if (killer != null && !killer.equals(player) && killerState != null && killerState.alive) {
             killerState.kills++;
             if (killerState.activeCastSpell != null) {
@@ -3134,9 +3152,13 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
             WizardState state = entry.getValue();
             if (plugin.isTestPlayer(entry.getKey())) continue;
+            boolean won = winner != null && winner.getUniqueId().equals(entry.getKey());
+            if (WizardsAchievementRules.manaReversal(won, state.manaReversalSurvivor,
+                    state.manaReversalElimination)) {
+                awardWizardsAchievement(entry.getKey(), "supreme-wizard");
+            }
             WizardsProgressStore.increment(config, entry.getKey(), "kills", state.kills);
             WizardsProgressStore.increment(config, entry.getKey(), "spells-bound", state.spellsBound);
-            boolean won = winner != null && winner.getUniqueId().equals(entry.getKey());
             if (WizardsAchievementRules.noSpellVictory(won, state.successfulCasts)) {
                 awardWizardsAchievement(entry.getKey(), "youre-a-wizard-harry");
             }
@@ -3175,13 +3197,6 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             }
             if (WizardsAchievementRules.finalWord(won, state.spellEliminationDuringEndgame)) {
                 awardWizardsAchievement(entry.getKey(), "the-final-word");
-            }
-        }
-        if (winner != null && states.containsKey(winner.getUniqueId())) {
-            String winsPath = "local-stats." + winner.getUniqueId() + ".wizards.wins";
-            long lifetimeWinsAfterRound = config.getLong(winsPath, 0L) + 1L;
-            if (WizardsAchievementRules.supremeWizard((int) Math.min(Integer.MAX_VALUE, lifetimeWinsAfterRound))) {
-                awardWizardsAchievement(winner.getUniqueId(), "supreme-wizard");
             }
         }
         // A shared Arcade session records the win (and games-played) in its common
@@ -3374,6 +3389,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         private float passiveManaRegenerated;
         private float manaSpentWithoutElimination;
         private boolean spellEliminationDuringEndgame;
+        private final Set<UUID> manaReversalCasters = new HashSet<>();
+        private boolean manaReversalSurvivor;
+        private boolean manaReversalElimination;
         private WizardsSpell activeCastSpell;
         private int activeCastWandSlot = -1;
         private long activeCastId;

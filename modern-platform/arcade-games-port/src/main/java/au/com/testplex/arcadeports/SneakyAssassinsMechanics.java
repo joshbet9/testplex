@@ -105,6 +105,7 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Set<UUID>> revealerTargets = new HashMap<>();
     private final Map<UUID, Integer> escapeArtistSmokeEscapes = new HashMap<>();
     private final Map<UUID, Integer> rangedAssassinBowKills = new HashMap<>();
+    private final Map<UUID, Double> minimumHealth = new HashMap<>();
     private final Map<UUID, Map<UUID, Long>> pendingSmokePursuits = new HashMap<>();
     private UUID lastEliminationByBribedVillagerOwner;
     private final Map<UUID, Long> lastPowerUpCollectedAt = new HashMap<>();
@@ -353,6 +354,7 @@ final class SneakyAssassinsMechanics {
             if (player == null || !player.isOnline()) continue;
             players.put(player.getUniqueId(), player);
             powerUpCounts.put(player.getUniqueId(), 0);
+            minimumHealth.put(player.getUniqueId(), player.getHealth());
             setDisguised(player);
         }
         prepareNpcPatrolAnchors();
@@ -1338,7 +1340,9 @@ final class SneakyAssassinsMechanics {
             eliminator.eliminate(target, attacker, reason);
         } else {
             target.setNoDamageTicks(0);
-            target.setHealth(Math.max(0.5D, target.getHealth() - damage));
+            double remainingHealth = Math.max(0.5D, target.getHealth() - damage);
+            minimumHealth.merge(target.getUniqueId(), remainingHealth, Math::min);
+            target.setHealth(remainingHealth);
             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         }
     }
@@ -1394,10 +1398,11 @@ final class SneakyAssassinsMechanics {
         if (winner == null || !players.containsKey(winner.getUniqueId())) return;
         UUID winnerId = winner.getUniqueId();
         if (!isTestPlayer.test(winnerId)) {
-            int wins = incrementLocalStat(winnerId, "wins");
-            if (wins >= SneakyAssassinsRules.SO_SO_SNEAKY_WINS_REQUIRED) {
-                awardAchievement(winner, "so-so-sneaky", "So So Sneaky");
-            }
+            incrementLocalStat(winnerId, "wins");
+        }
+        if (SneakyAssassinsRules.noWitnesses(true,
+                minimumHealth.getOrDefault(winnerId, winner.getHealth()))) {
+            awardAchievement(winner, "so-so-sneaky", "No Witnesses");
         }
         if (SneakyAssassinsRules.shouldAwardPaidInFull(true,
                 winnerId.equals(lastEliminationByBribedVillagerOwner))) {
@@ -1538,6 +1543,7 @@ final class SneakyAssassinsMechanics {
         revealerTargets.clear();
         escapeArtistSmokeEscapes.clear();
         rangedAssassinBowKills.clear();
+        minimumHealth.clear();
         pendingSmokePursuits.clear();
         lastEliminationByBribedVillagerOwner = null;
         lastPowerUpCollectedAt.clear();

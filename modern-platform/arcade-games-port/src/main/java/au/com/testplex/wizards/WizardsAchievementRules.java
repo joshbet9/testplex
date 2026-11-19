@@ -22,8 +22,9 @@ public final class WizardsAchievementRules {
         return won && familiesUsed == 1;
     }
 
-    public static boolean supremeWizard(int lifetimeWinsAfterRound) {
-        return lifetimeWinsAfterRound >= 15;
+    public static boolean manaReversal(boolean won, boolean survivedOpponentSpellAtOneHeart,
+            boolean eliminatedSameOpponentWithSpell) {
+        return won && survivedOpponentSpellAtOneHeart && eliminatedSameOpponentWithSpell;
     }
 
     public static boolean spellKillsAllCategories(boolean won, Set<WizardsSpell.Category> categories) {

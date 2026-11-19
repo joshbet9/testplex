@@ -48,7 +48,7 @@ public final class SpeedBuildersRules {
     static String achievementForLifetimeProgress(String metric, long value) {
         if (metric == null) return null;
         return switch (metric) {
-            case "wins" -> value >= 10L ? "speed-master" : null;
+            case "wins" -> null;
             case "perfect-builds" -> value >= 50L ? "dependable" : null;
             case "perfect-first" -> value >= 10L ? "first-build" : null;
             case "speediest-builderizer" -> value > 0L ? "speediest-builderizer" : null;
@@ -188,6 +188,12 @@ public final class SpeedBuildersRules {
         int threshold = Math.max(1, Math.min(100, GameDebugRuntimeOverrides.intValue(
                 "SPEED_BUILDERS_PERFECT_SCORE_PERCENT", PERFECT_SCORE_PERCENT)));
         return score * 100L >= expectedScore * (long) threshold;
+    }
+
+    /** Requires at least one imperfect early build, then only perfect builds through victory. */
+    static boolean secondDraft(boolean won, boolean hadEarlyImperfectBuild,
+            boolean everyBuildAfterFirstImperfectWasPerfect) {
+        return won && hadEarlyImperfectBuild && everyBuildAfterFirstImperfectWasPerfect;
     }
 
     public static int buildTimeDecreasePerRoundSeconds() {

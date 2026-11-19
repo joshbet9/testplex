@@ -24,7 +24,11 @@ class SpeedBuildersRulesTest {
         assertFalse(SpeedBuildersRules.shouldAwardRapidReplica(2));
         assertTrue(SpeedBuildersRules.shouldAwardRapidReplica(3));
         assertNull(SpeedBuildersRules.achievementForLifetimeProgress("wins", 9));
-        assertEquals("speed-master", SpeedBuildersRules.achievementForLifetimeProgress("wins", 10));
+        assertNull(SpeedBuildersRules.achievementForLifetimeProgress("wins", 10));
+        assertFalse(SpeedBuildersRules.secondDraft(false, true, true));
+        assertFalse(SpeedBuildersRules.secondDraft(true, false, true));
+        assertFalse(SpeedBuildersRules.secondDraft(true, true, false));
+        assertTrue(SpeedBuildersRules.secondDraft(true, true, true));
         assertNull(SpeedBuildersRules.achievementForLifetimeProgress("perfect-builds", 49));
         assertEquals("dependable", SpeedBuildersRules.achievementForLifetimeProgress("perfect-builds", 50));
         assertNull(SpeedBuildersRules.achievementForLifetimeProgress("perfect-first", 9));

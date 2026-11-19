@@ -4,7 +4,6 @@ package au.com.testplex.arcadeports;
 public final class TurfWarsAchievementRules {
     private TurfWarsAchievementRules() { }
 
-    public static final int TURF_MASTER_WINS = 50;
     public static final int SHREDDINATOR_BLOCKS = 2_000;
     public static final int DEAD_CENTRE_BOW_KILLS = 20;
     public static final int KEEP_YOUR_FORT_BLOCKS = 30;
@@ -24,5 +23,9 @@ public final class TurfWarsAchievementRules {
 
     public static boolean comeback(boolean won, boolean teamPreviouslyReachedFiveLinesOrFewer) {
         return won && teamPreviouslyReachedFiveLinesOrFewer;
+    }
+
+    public static boolean bankShotFinale(boolean won, boolean finalEliminationWasBounceShot) {
+        return won && finalEliminationWasBounceShot;
     }
 }

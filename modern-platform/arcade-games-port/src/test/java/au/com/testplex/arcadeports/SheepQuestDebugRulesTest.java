@@ -91,8 +91,6 @@ class SheepQuestDebugRulesTest {
         assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(99));
         assertTrue(ArcadePortRules.sheepQuestThiefAchievementReached(100));
         assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(100));
-        assertFalse(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(19));
-        assertTrue(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(20));
         assertTrue(ArcadePortRules.sheepQuestSelfishAchievementReached(13));
         assertFalse(ArcadePortRules.sheepQuestSelfishAchievementReached(12));
         assertFalse(ArcadePortRules.sheepQuestArcherAchievementReached(4));
@@ -103,14 +101,12 @@ class SheepQuestDebugRulesTest {
                 Map.entry("SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD", 1),
                 Map.entry("SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT", 2),
                 Map.entry("SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT", 3),
-                Map.entry("SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS", 4),
                 Map.entry("SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD", 5),
                 Map.entry("SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET", 6),
                 Map.entry("SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS", 7)));
         assertTrue(ArcadePortRules.sheepQuestSoloCarryQualified(1));
         assertTrue(ArcadePortRules.sheepQuestThiefAchievementReached(2));
         assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(3));
-        assertTrue(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(4));
         assertTrue(ArcadePortRules.sheepQuestSelfishAchievementReached(6));
         assertTrue(ArcadePortRules.sheepQuestArcherAchievementReached(6));
         assertTrue(ArcadePortRules.sheepQuestMovementCreditIsRecent(17L, 10L));
