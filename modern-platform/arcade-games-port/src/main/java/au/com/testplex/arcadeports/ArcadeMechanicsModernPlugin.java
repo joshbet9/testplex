@@ -156,7 +156,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         MonsterMazePlugin module = getMonsterMazeModule();
         if (player == null || module == null) return;
         module.refreshPlayerMobThemes(player);
-        if (module.getMobThemeManager() != null) module.getMobThemeManager().refreshPlayerPads(player);
+        if (module.getMobThemeManager() != null) {
+            module.getMobThemeManager().refreshPlayerPads(player);
+            // If the selected set is disabled mid-round, update the actual selector icon too.
+            // Schedule inventory changes after any currently active cosmetics-menu click.
+            var round = module.getGameManager();
+            if (round != null && round.getState() == me.monstermaze.game.GameState.LIVE
+                    && round.getAlivePlayers().contains(player)) {
+                getServer().getScheduler().runTask(this, () -> {
+                    if (player.isOnline() && round.getState() == me.monstermaze.game.GameState.LIVE
+                            && round.getAlivePlayers().contains(player)) {
+                        module.getMobThemeManager().giveSelector(player);
+                    }
+                });
+            }
+        }
     }
 
     public boolean isArcadeDebugRound() { return GameDebugRuntimeOverrides.isDebugSession(); }
