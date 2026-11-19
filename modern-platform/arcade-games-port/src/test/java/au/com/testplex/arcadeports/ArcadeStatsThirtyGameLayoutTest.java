@@ -80,7 +80,13 @@ class ArcadeStatsThirtyGameLayoutTest {
                             visitedTiers++;
                         }
                     }
-                    for (int footerSlot : ArcadeStatsLayout.milestoneFooterSlots(3))
+                    Set<Integer> reservedBottom = new HashSet<>();
+                    columns.stream().map(ArcadeStatsLayout::milestoneCategorySlot).forEach(reservedBottom::add);
+                    reservedBottom.add(ArcadeStatsLayout.PREVIOUS);
+                    reservedBottom.add(ArcadeStatsLayout.NEXT);
+                    occupied.add(ArcadeStatsLayout.PREVIOUS);
+                    occupied.add(ArcadeStatsLayout.NEXT);
+                    for (int footerSlot : ArcadeStatsLayout.milestoneFooterSlots(3, reservedBottom))
                         assertTrue(occupied.add(footerSlot), id + " milestone footer collision at " + footerSlot);
                 }
             }

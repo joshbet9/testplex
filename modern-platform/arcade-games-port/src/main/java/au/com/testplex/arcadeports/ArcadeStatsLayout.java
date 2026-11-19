@@ -1,7 +1,9 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Slot geometry shared by every 9x6 Arcade achievements/milestones inventory. */
 final class ArcadeStatsLayout {
@@ -83,15 +85,43 @@ final class ArcadeStatsLayout {
         return (STAGES_PER_PAGE - stageOffset) * 9 + column;
     }
 
-    /** Milestone tabs move to the top row to leave the final row for category labels. */
-    static List<Integer> milestoneFooterSlots(int count) {
+    /**
+     * Milestone navigation stays on the bottom row. Category tiles and visible page arrows are
+     * reserved first, then footer tabs are placed in the most centred remaining columns.
+     */
+    static List<Integer> milestoneFooterSlots(int count, Set<Integer> reservedSlots) {
         if (count < 0 || count > 3) throw new IllegalArgumentException("Expected 0-3 footer items");
-        return switch (count) {
+        Set<Integer> reserved = new HashSet<>(reservedSlots);
+        List<Integer> available = new ArrayList<>();
+        for (int column = 0; column < 9; column++)
+            if (!reserved.contains(milestoneCategorySlot(column))) available.add(column);
+        if (available.size() < count)
+            throw new IllegalArgumentException("Not enough bottom-row slots for milestone footer");
+        List<Integer> ideal = switch (count) {
             case 0 -> List.of();
             case 1 -> List.of(4);
             case 2 -> List.of(3, 5);
             default -> List.of(2, 4, 6);
         };
+        List<Integer> best = List.of();
+        int bestCost = Integer.MAX_VALUE;
+        int combinations = 1 << available.size();
+        for (int mask = 0; mask < combinations; mask++) {
+            if (Integer.bitCount(mask) != count) continue;
+            List<Integer> candidate = new ArrayList<>(count);
+            for (int index = 0; index < available.size(); index++)
+                if ((mask & (1 << index)) != 0) candidate.add(available.get(index));
+            int cost = 0;
+            for (int index = 0; index < count; index++) {
+                int delta = candidate.get(index) - ideal.get(index);
+                cost += delta * delta;
+            }
+            if (cost < bestCost) {
+                best = candidate;
+                bestCost = cost;
+            }
+        }
+        return best.stream().map(ArcadeStatsLayout::milestoneCategorySlot).toList();
     }
 
     /** Footer controls have a deliberate centre gap for two items, matching the Mineplex menus. */
