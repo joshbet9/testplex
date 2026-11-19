@@ -473,13 +473,27 @@ public void startGame(Location preferCenter, int requestedPattern) {
         });
     }
 
+    /**
+     * The shared Arcade lobby can leave participants invulnerable (and with residual
+     * vanilla hurt ticks). Monster Maze's own mob damage is legitimate after Live;
+     * unset this protection once, not per hit, while preserving event protections.
+     */
+    static void enableLiveMobDamage(Player player) {
+        if (player == null) return;
+        player.setInvulnerable(false);
+        player.setNoDamageTicks(0);
+    }
+
     private void beginLive() {
         state = GameState.LIVE;
         publishArcadePhase();
         if (startingTask != null) { startingTask.cancel(); startingTask = null; }
         liveStartMs = System.currentTimeMillis();
         mazeGenerator.dropContainment();
-        for (Player p : getAlivePlayers()) p.closeInventory();
+        for (Player p : getAlivePlayers()) {
+            p.closeInventory();
+            enableLiveMobDamage(p);
+        }
 
         titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
         broadcast(ChatColor.GREEN + "" + ChatColor.BOLD + "GO!");
