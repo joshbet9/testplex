@@ -74,11 +74,25 @@ class ArcadeCatalogTest {
     @Test
     void monsterMazeLegacyIdsResolveToTheSingleMobSetLine() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        List<String> expected = List.of("map_default", "creeper", "skeleton", "spider", "zombie", "slime",
-                "witch", "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
-                "endermite", "pig", "sheep", "cow", "chicken", "squid", "wolf", "mooshroom", "snowman",
-                "ocelot", "horse", "rabbit", "villager", "axolotl", "allay", "frog", "goat", "fox", "panda",
-                "parrot", "turtle", "bee", "sniffer", "armadillo", "random");
+        List<String> expected = List.of(
+                "map_default", "allay", "armadillo", "axolotl", "bat", "bee",
+                "blaze", "bogged", "breeze", "camel", "camel_husk", "cat",
+                "cave_spider", "chicken", "cod", "copper_golem", "cow", "creaking",
+                "creeper", "dolphin", "donkey", "drowned", "elder_guardian", "enderman",
+                "endermite", "evoker", "fox", "frog", "glow_squid", "goat",
+                "guardian", "hoglin", "horse", "husk", "illusioner", "iron_golem",
+                "llama", "magma_cube", "mooshroom", "mule", "nautilus", "ocelot",
+                "panda", "parched", "parrot", "phantom", "pig", "piglin",
+                "piglin_brute", "pillager", "polar_bear", "pufferfish", "rabbit", "ravager",
+                "salmon", "sheep", "shulker", "silverfish", "skeleton", "skeleton_horse",
+                "slime", "sniffer", "snowman", "spider", "squid", "stray",
+                "strider", "sulfur_cube", "tadpole", "trader_llama", "tropical_fish", "turtle",
+                "vex", "villager", "vindicator", "wandering_trader", "warden", "witch",
+                "wither_skeleton", "wolf", "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
+                "zombie_pigman", "zombie_villager", "random");
+        assertTrue(expected.containsAll(List.of("wither_skeleton", "copper_golem", "sulfur_cube", "warden", "nautilus")));
+        assertFalse(expected.contains("ghast"));
+        assertFalse(expected.contains("happy_ghast"));
         for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game);
@@ -98,6 +112,14 @@ class ArcadeCatalogTest {
             assertTrue(game.getCosmeticLines().get(0).getOptions().stream()
                     .anyMatch(option -> "pad-creeper".equals(option.getSelectionGroup())
                             && option.getId().equals("pad-creeper-blue")), id + " Safe Pad palette");
+            assertTrue(game.getCosmeticLines().get(0).getOptions().stream()
+                    .anyMatch(option -> "beacon-wither_skeleton".equals(option.getSelectionGroup())
+                            && option.getId().equals("beacon-wither_skeleton-purple")),
+                    id + " tall narrow mob beacon palette");
+            assertTrue(game.getCosmeticLines().get(0).getOptions().stream()
+                    .anyMatch(option -> "pad-sulfur_cube".equals(option.getSelectionGroup())
+                            && option.getId().equals("pad-sulfur_cube-yellow")),
+                    id + " new 26.3 mob safe pad palette");
         }
     }
 
