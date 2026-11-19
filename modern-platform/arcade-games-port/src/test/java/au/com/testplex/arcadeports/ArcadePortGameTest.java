@@ -1707,14 +1707,22 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Through Hell"));
     }
 
-    @Test void dragonEscapeCourseDoorsAndTrapdoorsRemainInteractable() {
+    @Test void dragonEscapeCourseDoorsTrapdoorsAndFenceGatesRemainInteractable() {
         assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("OAK_DOOR"));
         assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("IRON_DOOR"));
         assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("SPRUCE_TRAPDOOR"));
         assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("COPPER_TRAPDOOR"));
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("OAK_FENCE_GATE"));
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("WARPED_FENCE_GATE"));
         assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("CHEST"));
-        assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("OAK_FENCE_GATE"));
         assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed(null));
+    }
+
+    @Test void dragonEscapeLeapItemOnlyConsumesRightClickWhenChargesRemain() {
+        assertTrue(ArcadePortRules.shouldUseDragonEscapeLeap(1));
+        assertTrue(ArcadePortRules.shouldUseDragonEscapeLeap(4));
+        assertFalse(ArcadePortRules.shouldUseDragonEscapeLeap(0));
+        assertFalse(ArcadePortRules.shouldUseDragonEscapeLeap(-1));
     }
 
     @Test void dragonEscapeHellMapStartsAtNight() {

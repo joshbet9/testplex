@@ -31016,6 +31016,16 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && event.getAction().isRightClick()
+                && event.getClickedBlock() != null
+                && ArcadePortRules.isDragonEscapeDoorInteractionAllowed(
+                        event.getClickedBlock().getType().name())) {
+            // Course controls take precedence over every kit item, including
+            // the leap axe and the ghost selector.
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.gladiatorVotingEndsAt > System.currentTimeMillis()
                 && event.getAction().isRightClick() && event.getItem() != null
@@ -31057,6 +31067,7 @@ public final class ArcadePortManager implements Listener {
             else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
+
         if (session.type == ArcadePortGame.GLADIATORS && event.getPlayer().getGameMode() == GameMode.SPECTATOR) {
             ItemStack held = event.getItem();
             if (held != null && held.hasItemMeta() && "spectator-menu".equals(held.getItemMeta()
@@ -31476,7 +31487,8 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (event.getAction().isRightClick() && item == Material.IRON_AXE
-                    && ArcadePortRules.dragonEscapeLeapUses(kit) > 0) {
+                    && ArcadePortRules.shouldUseDragonEscapeLeap(
+                            session.dragonEscapeLeapUsesRemaining.getOrDefault(player.getUniqueId(), 0))) {
                 event.setCancelled(true);
                 useDragonEscapeLeap(session, player);
                 return;
@@ -31779,7 +31791,9 @@ public final class ArcadePortManager implements Listener {
                             && item == Material.BRICKS);
             case DRAGON_ESCAPE -> {
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
-                yield (item == Material.IRON_AXE && ArcadePortRules.dragonEscapeLeapUses(kit) > 0)
+                yield (item == Material.IRON_AXE && ArcadePortRules.shouldUseDragonEscapeLeap(
+                        session.dragonEscapeLeapUsesRemaining.getOrDefault(
+                                id, ArcadePortRules.dragonEscapeLeapUses(kit))))
                         || ("flutterfly".equals(kit) && isDragonEscapeFlutterFeather(heldItem))
                         || (item == Material.ENDER_PEARL && "warper".equals(kit))
                         || (item == Material.TNT && "disruptor".equals(kit))

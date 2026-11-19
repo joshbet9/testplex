@@ -3803,7 +3803,13 @@ public final class ArcadePortRules {
     public static boolean isDragonEscapeDoorInteractionAllowed(String materialName) {
         if (materialName == null) return false;
         String material = materialName.toUpperCase(java.util.Locale.ROOT);
-        return material.endsWith("_DOOR") || material.endsWith("_TRAPDOOR");
+        return material.endsWith("_DOOR") || material.endsWith("_TRAPDOOR")
+                || material.endsWith("_FENCE_GATE");
+    }
+
+    /** Do not fire an exhausted leap item when the player right-clicks a course control. */
+    public static boolean shouldUseDragonEscapeLeap(int remainingUses) {
+        return remainingUses > 0;
     }
 
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
