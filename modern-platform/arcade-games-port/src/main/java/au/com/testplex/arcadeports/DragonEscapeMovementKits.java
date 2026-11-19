@@ -17,10 +17,9 @@ final class DragonEscapeMovementKits {
     static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
     // A single right-click launches a bounce. XP no longer powers Flutterfly.
     static final int FLUTTER_MAX_CHARGES = 5;
-    // Bukkit has no use-button release event for ordinary feathers. Keep a brief
-    // 200 ms event-free interval to infer a new press rather than a held-repeat.
-    // Hold repeat rates vary, so this is a playtest compromise, not an exact release detector.
-    static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 200L;
+    // Bukkit has no use-button release event for ordinary feathers. A 100 ms
+    // quiet interval distinguishes a new Feather click from held-button repeats.
+    static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 100L;
     // A six-second interval regenerates Flutterfly charges 33.3% faster.
     static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 6_000L;
     // Raise the tested Flutterfly bounce's minimum horizontal impulse by 20%.
@@ -202,40 +201,35 @@ final class DragonEscapeMovementKits {
         }
     }
 
-    /**
-     * User input steers each flutter at around 100% of standard ground sprint.
-     * If no directional key is held, continue existing travel direction;
-     * looking direction is a fallback when starting from standstill.
-     */
-    static Vector flutterTravelDirection(Vector current, Vector facing,
-            boolean forward, boolean backward, boolean left, boolean right) {
-        Vector look = facing == null ? new Vector(0, 0, 1) : facing.clone().setY(0.0D);
-        if (look.lengthSquared() < 1.0E-8D) look = new Vector(0, 0, 1);
-        look.normalize();
-        Vector rightVector = new Vector(-look.getZ(), 0.0D, look.getX());
-        double forwardInput = (forward ? 1.0D : 0.0D) - (backward ? 1.0D : 0.0D);
-        double rightInput = (right ? 1.0D : 0.0D) - (left ? 1.0D : 0.0D);
-        Vector steering = look.clone().multiply(forwardInput)
-                .add(rightVector.multiply(rightInput));
-        if (steering.lengthSquared() > 1.0E-8D) return steering.normalize();
-        Vector momentum = current.clone().setY(0.0D);
-        return momentum.lengthSquared() > 1.0E-6D ? momentum.normalize() : look;
+    /** Flutterfly launches in the horizontal direction the player is facing. */
+    static Vector flutterTravelDirection(Vector facing) {
+        Vector look = facing == null ? new Vector(0.0D, 0.0D, 1.0D) : facing.clone().setY(0.0D);
+        if (look.lengthSquared() < 1.0E-8D) look = new Vector(0.0D, 0.0D, 1.0D);
+        return look.normalize();
     }
 
     /**
-     * One mid-air feather click applies normal Minecraft velocity, not a
-     * repeating Yoshi flutter. WASD steers the horizontal push, using the
-     * current momentum/facing as fallback; gravity resumes immediately.
+     * A Feather bounce preserves the player's horizontal speed while steering
+     * the launch along the direction they are facing.
      */
-    static Vector flutterBounceVelocity(Vector current, Vector facing,
-            boolean forward, boolean backward, boolean left, boolean right) {
-        Vector direction = flutterTravelDirection(current, facing,
-                forward, backward, left, right);
-        // Do not slow a player who is already carrying greater sprint momentum.
+    static Vector flutterBounceVelocity(Vector current, Vector facing) {
+        Vector direction = flutterTravelDirection(facing);
         double horizontalSpeed = current == null ? 0.0D
                 : Math.hypot(current.getX(), current.getZ());
         return direction.multiply(Math.max(FLUTTER_HORIZONTAL_SPEED, horizontalSpeed))
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
+    }
+
+    static boolean shouldShowDragonEscapeLeapItem(int remainingUses) {
+        return remainingUses > 0;
+    }
+
+    static boolean dragonEscapePlayerVisibleByDefault() {
+        return false;
+    }
+
+    static boolean toggleDragonEscapePlayerVisibility(boolean currentlyVisible) {
+        return !currentlyVisible;
     }
 
     static double acrobatFallDamage(String kit, double vanillaFallDamage) {
