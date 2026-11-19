@@ -61,6 +61,7 @@ public final class MenuService implements Listener {
     private final NamespacedKey optionKey;
     private final NamespacedKey targetKey;
     private final Map<UUID, Integer> cosmeticOptionPages = new HashMap<>();
+    private final Map<UUID, Integer> monsterMazeMobPages = new HashMap<>();
 
     public MenuService(JavaPlugin plugin, ArcadeCatalog catalog, PlayerPreferenceStore preferences) {
         this.plugin = plugin;
@@ -643,16 +644,33 @@ public final class MenuService implements Listener {
     }
 
 
-    /** Monster Maze uses one mob item per form, not the generic >1,000-option colour catalogue. */
+    /** Monster Maze has a dedicated multi-page mob list, not the full colour catalogue. */
     private void openMonsterMazeMobSets(Player player, GameDefinition game) {
+        openMonsterMazeMobSets(player, game,
+                monsterMazeMobPages.getOrDefault(player.getUniqueId(), 0));
+    }
+
+    static int monsterMazeMobPageCount(int mobCount) {
+        return Math.max(1, (Math.max(0, mobCount) + 44) / 45);
+    }
+
+    static int monsterMazeMobPage(int requestedPage, int mobCount) {
+        return Math.max(0, Math.min(monsterMazeMobPageCount(mobCount) - 1, requestedPage));
+    }
+
+    private void openMonsterMazeMobSets(Player player, GameDefinition game, int requestedPage) {
         CosmeticLineDefinition line = findLine(game, "mob-sets");
         if (line == null) return;
+        List<CosmeticOption> mobs = line.getOptions().stream()
+                .filter(MenuService::isMonsterMazeMobChoice).toList();
+        int page = monsterMazeMobPage(requestedPage, mobs.size());
+        int pageCount = monsterMazeMobPageCount(mobs.size());
+        monsterMazeMobPages.put(player.getUniqueId(), page);
         Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + MAZE_MOBS_TITLE);
         Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
-        int slot = 0;
-        for (CosmeticOption option : line.getOptions()) {
-            if (!isMonsterMazeMobChoice(option)) continue;
-            if (slot >= 45) break;
+        int startIndex = page * 45;
+        for (int index = startIndex; index < Math.min(mobs.size(), startIndex + 45); index++) {
+            CosmeticOption option = mobs.get(index);
             boolean enabled = selected.contains(option.getId());
             ItemStack item = makeItem(monsterMazeMobIcon(option.getId()),
                     (enabled ? ChatColor.GREEN + "✓ " : ChatColor.GRAY + "") + option.getName(),
@@ -662,16 +680,24 @@ public final class MenuService implements Listener {
                             ChatColor.YELLOW + "Right click: enable / disable",
                             ChatColor.AQUA + "Left click: Safe Pad + beacon colours"));
             mark(item, "maze-mob", game, line, option.getId());
-            inventory.setItem(slot++, item);
+            inventory.setItem(index - startIndex, item);
         }
         inventory.setItem(45, backItem("Back to Games", "back-arcade-cosmetics", game));
-        ItemStack close = makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of());
-        mark(close, "maze-close", game, null, null);
-        inventory.setItem(49, close);
+        if (page > 0) {
+            ItemStack previous = backItem("Previous Mob Page", "maze-mob-page", game);
+            mark(previous, "maze-mob-page", game, line, Integer.toString(page - 1));
+            inventory.setItem(46, previous);
+        }
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
         ItemStack wins = makeItem(Material.FIREWORK_ROCKET, ChatColor.GOLD + "Win Effects",
                 List.of(ChatColor.GRAY + "Configure Monster Maze win effects."));
         mark(wins, "win-effects", game, null, null);
         inventory.setItem(51, wins);
+        if (page + 1 < pageCount) {
+            ItemStack next = backItem("Next Mob Page", "maze-mob-page", game);
+            mark(next, "maze-mob-page", game, line, Integer.toString(page + 1));
+            inventory.setItem(52, next);
+        }
         player.openInventory(inventory);
     }
 
@@ -735,6 +761,7 @@ public final class MenuService implements Listener {
             case "random" -> Material.NETHER_STAR;
             case "creeper" -> Material.CREEPER_HEAD;
             case "skeleton" -> Material.SKELETON_SKULL;
+            case "wither_skeleton" -> Material.WITHER_SKELETON_SKULL;
             case "zombie" -> Material.ZOMBIE_HEAD;
             case "snowman" -> Material.PUMPKIN;
             default -> {
@@ -744,7 +771,7 @@ public final class MenuService implements Listener {
                     default -> mob.toUpperCase(Locale.ROOT);
                 };
                 Material egg = Material.matchMaterial(modern + "_SPAWN_EGG");
-                yield egg == null ? Material.PIG_SPAWN_EGG : egg;
+                yield egg == null ? Material.PAPER : egg;
             }
         };
     }
@@ -873,7 +900,13 @@ public final class MenuService implements Listener {
 
 
         if (MAZE_MOBS_TITLE.equals(title) && game != null && "monster-maze".equals(game.getId())) {
-            if ("maze-mob".equals(action) && optionId != null) {
+            if ("maze-mob-page".equals(action) && optionId != null) {
+                try {
+                    openMonsterMazeMobSets(player, game, Integer.parseInt(optionId));
+                } catch (NumberFormatException ignored) {
+                    openMonsterMazeMobSets(player, game);
+                }
+            } else if ("maze-mob".equals(action) && optionId != null) {
                 CosmeticLineDefinition line = findLine(game, "mob-sets");
                 if (line != null && line.getOptions().stream().anyMatch(
                         option -> isMonsterMazeMobChoice(option) && option.getId().equals(optionId))) {
