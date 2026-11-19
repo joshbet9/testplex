@@ -114,7 +114,11 @@ public class SafePad implements Listener {
     public boolean isActive() { return active; }
 
     public boolean isOn(Entity entity) {
-        return entity != null && isWithinFootprint(center, surfaceY, entity.getLocation(), mode);
+        return entity != null && isOn(entity.getLocation());
+    }
+
+    public boolean isOn(Location location) {
+        return isWithinFootprint(center, surfaceY, location, mode);
     }
 
     static boolean isWithinFootprint(Location center, int surfaceY, Location location) {
