@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,18 +40,52 @@ class ArcadeStatsLayoutTest {
     }
 
     @Test
-    void milestoneTiersAreArrangedFromBottomToTopWithoutTouchingTheFooter() {
-        assertEquals(40, ArcadeStatsLayout.milestoneCategorySlot(4));
-        assertEquals(3, ArcadeStatsLayout.milestoneTierSlot(0, 4) / 9);
-        assertEquals(2, ArcadeStatsLayout.milestoneTierSlot(1, 4) / 9);
-        assertEquals(1, ArcadeStatsLayout.milestoneTierSlot(2, 4) / 9);
-        assertEquals(0, ArcadeStatsLayout.milestoneTierSlot(3, 4) / 9);
-        assertEquals(31, ArcadeStatsLayout.milestoneTierSlot(0, 4));
-        assertEquals(4, ArcadeStatsLayout.milestoneTierSlot(3, 4));
+    void milestoneTiersAreArrangedAboveTheBottomCategoryRow() {
+        assertEquals(49, ArcadeStatsLayout.milestoneCategorySlot(4));
+        assertEquals(4, ArcadeStatsLayout.milestoneTierSlot(0, 4) / 9);
+        assertEquals(3, ArcadeStatsLayout.milestoneTierSlot(1, 4) / 9);
+        assertEquals(2, ArcadeStatsLayout.milestoneTierSlot(2, 4) / 9);
+        assertEquals(1, ArcadeStatsLayout.milestoneTierSlot(3, 4) / 9);
+        assertEquals(40, ArcadeStatsLayout.milestoneTierSlot(0, 4));
+        assertEquals(13, ArcadeStatsLayout.milestoneTierSlot(3, 4));
         assertThrows(IllegalArgumentException.class,
                 () -> ArcadeStatsLayout.milestoneTierSlot(4, 4));
         assertThrows(IllegalArgumentException.class,
                 () -> ArcadeStatsLayout.milestoneTierSlot(0, 9));
+        assertEquals(List.of(49), ArcadeStatsLayout.milestoneFooterSlots(1, Set.of()));
+        assertEquals(List.of(48, 50), ArcadeStatsLayout.milestoneFooterSlots(2, Set.of()));
+        assertEquals(List.of(47, 49, 51), ArcadeStatsLayout.milestoneFooterSlots(3, Set.of()));
+    }
+
+    @Test
+    void milestoneCategoriesTabsAndPageArrowsNeverOverlapOnBottomRow() {
+        for (int categoryCount = 0; categoryCount <= ArcadeStatsLayout.TRACKS_PER_PAGE; categoryCount++) {
+            List<Integer> categoryColumns = ArcadeStatsLayout.milestoneColumns(categoryCount);
+            for (int footerCount = 0; footerCount <= 3; footerCount++) {
+                for (boolean previous : List.of(false, true)) {
+                    for (boolean next : List.of(false, true)) {
+                        if (categoryCount + footerCount + (previous ? 1 : 0) + (next ? 1 : 0) > 9)
+                            continue;
+                        Set<Integer> reserved = new HashSet<>();
+                        categoryColumns.stream().map(ArcadeStatsLayout::milestoneCategorySlot)
+                                .forEach(reserved::add);
+                        if (previous) reserved.add(ArcadeStatsLayout.PREVIOUS);
+                        if (next) reserved.add(ArcadeStatsLayout.NEXT);
+                        List<Integer> footer = ArcadeStatsLayout.milestoneFooterSlots(footerCount, reserved);
+                        Set<Integer> occupied = new HashSet<>(reserved);
+                        footer.forEach(slot -> assertTrue(occupied.add(slot), "footer overlap at " + slot));
+                        assertEquals(footerCount, footer.size());
+                        assertTrue(footer.stream().allMatch(slot -> slot >= 45 && slot <= 53));
+                    }
+                }
+            }
+        }
+        Set<Integer> fourCategoriesAndTwoArrows = new HashSet<>();
+        ArcadeStatsLayout.milestoneColumns(4).stream()
+                .map(ArcadeStatsLayout::milestoneCategorySlot).forEach(fourCategoriesAndTwoArrows::add);
+        fourCategoriesAndTwoArrows.add(ArcadeStatsLayout.PREVIOUS);
+        fourCategoriesAndTwoArrows.add(ArcadeStatsLayout.NEXT);
+        assertEquals(List.of(47, 49, 51), ArcadeStatsLayout.milestoneFooterSlots(3, fourCategoriesAndTwoArrows));
     }
 
     @Test

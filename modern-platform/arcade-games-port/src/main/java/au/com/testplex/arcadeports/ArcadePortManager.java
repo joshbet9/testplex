@@ -26688,6 +26688,11 @@ public final class ArcadePortManager implements Listener {
 
     /** Each /stats tab links to the other applicable tabs; the active tab is never duplicated. */
     private void addStatsTabFooter(Inventory inventory, String gameId, StatsPage current) {
+        addStatsTabFooter(inventory, gameId, current, Set.of());
+    }
+
+    private void addStatsTabFooter(Inventory inventory, String gameId, StatsPage current,
+                                  Set<Integer> reservedSlots) {
         record Tab(Material icon, String name, String description, String action) { }
         List<Tab> tabs = new ArrayList<>();
         if (current != StatsPage.GAME)
@@ -26705,7 +26710,9 @@ public final class ArcadePortManager implements Listener {
         if (current != StatsPage.KIT_LEVELS)
             tabs.add(new Tab(Material.BLAZE_POWDER, "Kit Levels", "View XP earned using each kit.",
                     "open-game-kit-levels"));
-        List<Integer> slots = ArcadeStatsLayout.footerSlots(tabs.size());
+        List<Integer> slots = current == StatsPage.MILESTONES
+                ? ArcadeStatsLayout.milestoneFooterSlots(tabs.size(), reservedSlots)
+                : ArcadeStatsLayout.footerSlots(tabs.size());
         for (int i = 0; i < tabs.size(); i++) {
             Tab tab = tabs.get(i);
             inventory.setItem(slots.get(i), statsItem(tab.icon(), ChatColor.AQUA + tab.name(),
@@ -26914,7 +26921,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (tracks.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
                 ChatColor.GRAY + "No Milestones Configured", List.of(), "noop", null, gameId));
-        addStatsTabFooter(inventory, gameId, StatsPage.MILESTONES);
+        Set<Integer> reservedBottomSlots = new HashSet<>();
+        for (int column : columns)
+            reservedBottomSlots.add(ArcadeStatsLayout.milestoneCategorySlot(column));
+        if (page > 0) reservedBottomSlots.add(ArcadeStatsLayout.PREVIOUS);
+        if (page + 1 < pages) reservedBottomSlots.add(ArcadeStatsLayout.NEXT);
+        addStatsTabFooter(inventory, gameId, StatsPage.MILESTONES, reservedBottomSlots);
         if (page > 0) inventory.setItem(ArcadeStatsLayout.PREVIOUS,
                 statsItem(Material.ARROW, ChatColor.YELLOW + "← Previous Page", List.of(),
                         "open-milestones-page", Integer.toString(page - 1), gameId));
