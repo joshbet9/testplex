@@ -664,7 +664,7 @@ public final class MenuService implements Listener {
             mark(item, "maze-mob", game, line, option.getId());
             inventory.setItem(slot++, item);
         }
-        inventory.setItem(45, backItem("Back to Games", "back-arcade-cosmetics", null));
+        inventory.setItem(45, backItem("Back to Games", "back-arcade-cosmetics", game));
         ItemStack close = makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of());
         mark(close, "maze-close", game, null, null);
         inventory.setItem(49, close);
