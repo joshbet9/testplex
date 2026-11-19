@@ -54,7 +54,7 @@ final class ArcadeStatsLayout {
         return List.copyOf(slots);
     }
 
-    /** Up to four milestone tracks, aligned with their four tier rows below. */
+    /** Up to four milestone tracks, aligned with the tier column above each bottom category block. */
     static List<Integer> milestoneColumns(int count) {
         if (count < 0 || count > TRACKS_PER_PAGE)
             throw new IllegalArgumentException("Expected 0-4 milestone tracks");
@@ -67,13 +67,20 @@ final class ArcadeStatsLayout {
         };
     }
 
-    /** Milestone tiers progress visually from the bottom row upward. */
+    /** Category blocks sit beneath their tiers so each track reads upward from its label. */
+    static int milestoneCategorySlot(int column) {
+        if (column < 0 || column > 8)
+            throw new IllegalArgumentException("Expected inventory column 0-8");
+        return 4 * 9 + column;
+    }
+
+    /** Tier 1 is directly above the category block; later tiers continue upward. */
     static int milestoneTierSlot(int stageOffset, int column) {
         if (stageOffset < 0 || stageOffset >= STAGES_PER_PAGE)
             throw new IllegalArgumentException("Expected milestone tier offset 0-" + (STAGES_PER_PAGE - 1));
         if (column < 0 || column > 8)
             throw new IllegalArgumentException("Expected inventory column 0-8");
-        return (STAGES_PER_PAGE - stageOffset) * 9 + column;
+        return (STAGES_PER_PAGE - 1 - stageOffset) * 9 + column;
     }
 
     /** Footer controls have a deliberate centre gap for two items, matching the Mineplex menus. */
