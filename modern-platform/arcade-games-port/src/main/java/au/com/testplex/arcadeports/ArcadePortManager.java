@@ -5370,8 +5370,10 @@ public final class ArcadePortManager implements Listener {
         }
         // A mapped game must remain on its authentic legacy terrain. Never overwrite
         // an imported map with a synthetic platform if its metadata or starts are invalid.
-        if (type != ArcadePortGame.SNEAKY_ASSASSINS && SourceMapCatalog.hasMap(type)
-                && (!sourceMapWorlds.contains(type.id()) || sourceMapData.get(type.id()) == null)) {
+        if (SourceMapCatalog.hasMap(type)
+                && (!sourceMapWorlds.contains(type.id()) || sourceMapData.get(type.id()) == null)
+                && !SourceMapCatalog.isSneakyAssassinsFlatTest(type,
+                        SourceMapCatalog.selectedResource(plugin, type))) {
             sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
                     + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
             return;
@@ -6172,22 +6174,23 @@ public final class ArcadePortManager implements Listener {
     }
 
     private World createWorld(ArcadePortGame type, boolean allowSourceMap) {
-        // Use the normal Sneaky Assassins game/world lifecycle, not an opt-in,
-        // standalone test session. Original source archives remain unmodified.
-        if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            String gameWorldName = "arcadeport_proto_sneaky_assassins";
-            World gameWorld = Bukkit.getWorld(gameWorldName);
-            if (gameWorld == null) gameWorld = new WorldCreator(gameWorldName)
+        // The flat test arena is an ordinary selectable map, not a replacement
+        // for any archived map. Reuse the standard reserved source world lifecycle.
+        if (allowSourceMap && SourceMapCatalog.isSneakyAssassinsFlatTest(type,
+                SourceMapCatalog.selectedResource(plugin, type))) {
+            String testWorldName = "arcadeport_source_" + type.id().replace('-', '_');
+            World testWorld = Bukkit.getWorld(testWorldName);
+            if (testWorld == null) testWorld = new WorldCreator(testWorldName)
                     .type(WorldType.FLAT).generateStructures(false).createWorld();
-            if (gameWorld == null) throw new IllegalStateException("Could not load Sneaky Assassins game world.");
-            gameWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
-            gameWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-            gameWorld.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
-            gameWorld.setGameRule(GameRule.KEEP_INVENTORY, true);
-            gameWorld.setSpawnLocation(0, 64, 0);
+            if (testWorld == null) throw new IllegalStateException("Could not load Sneaky Assassins test map.");
             sourceMapWorlds.remove(type.id());
-            sourceMapData.put(type.id(), SourceMapCatalog.sneakyAssassinsFlatTestData(gameWorld));
-            return gameWorld;
+            sourceMapData.put(type.id(), SourceMapCatalog.sneakyAssassinsFlatTestData(testWorld));
+            testWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+            testWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+            testWorld.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+            testWorld.setGameRule(GameRule.KEEP_INVENTORY, true);
+            testWorld.setSpawnLocation(0, 64, 0);
+            return testWorld;
         }
         String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
         World world = allowSourceMap ? Bukkit.getWorld(sourceWorldName) : null;
@@ -6348,7 +6351,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            sneakyAssassins.buildFlatTestArena(world);
+            if (SourceMapCatalog.isSneakyAssassinsFlatTest(type,
+                    SourceMapCatalog.selectedResource(plugin, type))) sneakyAssassins.buildFlatTestArena(world);
+            else sneakyAssassins.buildArena(world);
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
@@ -6511,7 +6516,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
             SourceMapCatalog.MapData map = sourceMapData.get(type.id());
-            if (map != null && !map.spawnLocations().isEmpty()) {
+            if (SourceMapCatalog.isSneakyAssassinsFlatTest(type,
+                    SourceMapCatalog.selectedResource(plugin, type))
+                    && map != null && !map.spawnLocations().isEmpty()) {
                 List<Location> authored = map.spawnLocations();
                 List<Location> chosen = new ArrayList<>();
                 for (int i = 0; i < Math.max(1, count); i++) chosen.add(authored.get(i % authored.size()).clone());
