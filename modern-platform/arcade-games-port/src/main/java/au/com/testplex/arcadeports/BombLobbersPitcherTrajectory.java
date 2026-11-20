@@ -17,6 +17,7 @@ final class BombLobbersPitcherTrajectory {
     }
 
     static boolean isDestroyableBlock(Material material) {
+        // Four-power TNT can break blocks only below roughly this resistance.
         return material != null && material.isBlock() && material.isSolid()
                 && material.getBlastResistance() < 13.0F;
     }
