@@ -225,9 +225,8 @@ final class DragonEscapeMovementKits {
     static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
 
     static boolean shouldSelfTriggerDragonEscapeMine(
-            boolean sameOwner, int itemAgeTicks, double distanceToMine,
-            int armTicks, double triggerRadius) {
-        return sameOwner && itemAgeTicks >= Math.max(0, armTicks)
+            boolean sameOwner, boolean ownerClearedMine, double distanceToMine, double triggerRadius) {
+        return sameOwner && ownerClearedMine
                 && Double.isFinite(distanceToMine) && distanceToMine >= 0.0D
                 && Double.isFinite(triggerRadius) && triggerRadius >= 0.0D
                 && distanceToMine <= triggerRadius;
