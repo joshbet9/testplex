@@ -25,6 +25,26 @@ class BombLobbersPitcherTrajectoryTest {
     }
 
     @Test
+    void directlyAimedEdgeSurfaceOverridesTheOldScannedIslandFallback() {
+        Vector aimedAtTurtleHeadTip = new Vector(24.5D, 0.0D, 3.5D);
+        Vector oldRadiusCandidate = new Vector(18.5D, 0.0D, 2.5D);
+
+        Vector selected = BombLobbersPitcherTrajectory.selectTargetOffset(
+                aimedAtTurtleHeadTip, oldRadiusCandidate);
+
+        assertEquals(aimedAtTurtleHeadTip, selected);
+    }
+
+    @Test
+    void unavailableDirectAimFallsBackToAScannedSurface() {
+        Vector fallback = new Vector(17.5D, 2.0D, -1.5D);
+
+        assertEquals(fallback, BombLobbersPitcherTrajectory.selectTargetOffset(
+                new Vector(0.0D, 0.0D, 0.0D), fallback));
+        assertNull(BombLobbersPitcherTrajectory.selectTargetOffset(null, null));
+    }
+
+    @Test
     void invalidAimOrDistanceDoesNotCreateAnUnsafeVelocity() {
         Vector normal = new Vector(2.0D, 0.1D, 0.0D);
         assertNull(BombLobbersPitcherTrajectory.velocityToTarget(

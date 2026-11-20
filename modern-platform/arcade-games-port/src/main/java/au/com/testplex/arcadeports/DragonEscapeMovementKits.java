@@ -229,13 +229,6 @@ final class DragonEscapeMovementKits {
         return material == org.bukkit.Material.TNT && "Disruptor".equals(displayName);
     }
 
-    /** Only a top-face click on the block directly under the racer is a self-launch use. */
-    static boolean shouldSelfLaunchDisruptorFromUnderfoot(
-            boolean rightClickBlock, boolean topFace, boolean clickedSupportBlock, double feetClearance) {
-        return rightClickBlock && topFace && clickedSupportBlock
-                && Double.isFinite(feetClearance) && feetClearance >= -0.05D && feetClearance <= 0.18D;
-    }
-
     static boolean hasDisruptorSupportClearance(boolean solidSupport, double feetY, double supportTopY) {
         double clearance = feetY - supportTopY;
         return solidSupport && Double.isFinite(clearance) && clearance >= -0.05D && clearance <= 0.18D;
@@ -249,6 +242,13 @@ final class DragonEscapeMovementKits {
     static boolean isRecentDisruptorSupport(long supportSeenAtMillis, long nowMillis, int pingMillis) {
         long age = nowMillis - supportSeenAtMillis;
         return age >= 0L && age <= disruptorSupportHistoryMillis(pingMillis);
+    }
+
+    /** Only a top-face click on the block directly under the racer is a self-launch use. */
+    static boolean shouldSelfLaunchDisruptorFromUnderfoot(
+            boolean rightClickBlock, boolean topFace, boolean clickedSupportBlock, double feetClearance) {
+        return rightClickBlock && topFace && clickedSupportBlock
+                && Double.isFinite(feetClearance) && feetClearance >= -0.05D && feetClearance <= 0.18D;
     }
 
     /** Adds an immediate vertical TNT impulse, independent of item pickup timing. */
