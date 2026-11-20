@@ -36539,7 +36539,10 @@ public final class ArcadePortManager implements Listener {
         int radius = 64;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                Block top = session.world.getHighestBlockAt(centre.getBlockX() + dx, centre.getBlockZ() + dz);
+                int x = centre.getBlockX() + dx;
+                int z = centre.getBlockZ() + dz;
+                if (!session.world.isChunkLoaded(x >> 4, z >> 4)) continue;
+                Block top = session.world.getHighestBlockAt(x, z);
                 if (!BombLobbersPitcherTrajectory.isDestroyableBlock(top.getType()) || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
                 Location surface = new Location(session.world,
                         top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
