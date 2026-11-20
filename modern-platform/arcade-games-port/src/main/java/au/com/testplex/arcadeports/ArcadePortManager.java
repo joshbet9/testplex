@@ -10032,7 +10032,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if ("disruptor".equals(kit)) {
                     setDragonEscapeKitBlockCharges(player, Material.TNT, "Disruptor",
-                            "Stationary mine; opponents trigger it on pickup after 2 seconds. Sneak + right-click nearby TNT to boost in your aim direction.", 1);
+                            "Stationary mine; opponents trigger it on pickup after 2 seconds. Right-click nearby armed TNT to launch from its blast.", 1);
                 } else if ("builder".equals(kit)) {
                     int startingBricks = Math.max(0, GameDebugRuntimeOverrides.intValue(
                             "DRAGON_ESCAPE_BUILDER_MAX_BRICKS", ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS));
@@ -17756,11 +17756,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     /**
-     * Sneak-right-clicking TNT consumes the nearest armed mine the Disruptor
-     * owns and launches them along their look vector. Ordinary TNT use still
-     * places a stationary mine; opponent pickup behavior remains separate.
+     * Right-clicking with TNT beside an armed mine triggers it as a TNT jump.
+     * Standing/aiming around the mine controls the blast angle. If no armed
+     * mine is nearby, the same right-click remains the ordinary mine placement.
      */
-    private void useDragonEscapeDisruptorSelfBoost(Session session, Player player) {
+    private boolean useDragonEscapeDisruptorSelfBoost(Session session, Player player) {
         UUID ownerId = player.getUniqueId();
         int armTicks = Math.max(0, GameDebugRuntimeOverrides.intValue(
                 "DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS));
@@ -17774,21 +17774,22 @@ public final class ArcadePortManager implements Listener {
             if (!(entity instanceof Item mine) || !mine.isValid()) continue;
             double distance = player.getLocation().distance(mine.getLocation());
             if (!DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                    true, player.isSneaking(), mine.getTicksLived(), distance, armTicks, radius)) continue;
+                    true, mine.getTicksLived(), distance, armTicks, radius)) continue;
             if (distance < nearestDistance) {
                 nearest = mine;
                 nearestDistance = distance;
             }
         }
         if (nearest == null) {
-            player.sendActionBar(ChatColor.YELLOW
-                    + "Sneak + right-click TNT beside your armed mine to launch in your look direction.");
-            return;
+            return false;
         }
 
-        Vector launch = DragonEscapeMovementKits.disruptorSelfBoostVelocity(
-                player.getLocation().getDirection());
-        if (launch.lengthSquared() == 0.0D) return;
+        Vector mineCenter = nearest.getLocation().toVector().add(new Vector(0.0D, 0.25D, 0.0D));
+        Vector playerCenter = player.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
+        Vector launch = DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                player.getVelocity(), playerCenter, mineCenter, radius);
+        if (!Double.isFinite(launch.getX()) || !Double.isFinite(launch.getY())
+                || !Double.isFinite(launch.getZ())) return false;
         session.dragonEscapeMineOwners.remove(nearest.getUniqueId());
         session.entities.remove(nearest);
         nearest.remove();
@@ -17798,6 +17799,7 @@ public final class ArcadePortManager implements Listener {
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(),
                 10, 0.18D, 0.18D, 0.18D, 0.025D);
         player.sendActionBar(ChatColor.GREEN + "Disruptor boosted!");
+        return true;
     }
 
     private void throwDragonEscapeMine(Session session, Player player) {
@@ -18254,7 +18256,7 @@ public final class ArcadePortManager implements Listener {
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.TNT) < maxTnt) {
                         rechargeDragonEscapeKitBlock(player, Material.TNT, "Disruptor",
-                                "Stationary mine; opponents trigger it on pickup after 2 seconds. Sneak + right-click nearby TNT to boost in your aim direction.", maxTnt);
+                                "Stationary mine; opponents trigger it on pickup after 2 seconds. Right-click nearby armed TNT to launch from its blast.", maxTnt);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextTntAt.put(id, now + interval);
@@ -31649,12 +31651,15 @@ public final class ArcadePortManager implements Listener {
                 useDragonEscapeWarper(session, player);
                 return;
             }
-            if (event.getAction().isRightClick() && item == Material.TNT
-                    && "disruptor".equals(kit) && player.isSneaking()) {
-                event.setCancelled(true);
-                if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
-                useDragonEscapeDisruptorSelfBoost(session, player);
-                return;
+            if (event.getAction().isRightClick() && item == Material.TNT && "disruptor".equals(kit)) {
+                if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
+                    event.setCancelled(true);
+                    return;
+                }
+                if (useDragonEscapeDisruptorSelfBoost(session, player)) {
+                    event.setCancelled(true);
+                    return;
+                }
             }
             if ((event.getAction().isRightClick() || event.getAction() == Action.LEFT_CLICK_AIR)
                     && item == Material.TNT && "disruptor".equals(kit)) {
