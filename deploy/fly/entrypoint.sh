@@ -122,8 +122,10 @@ tar -xzf /opt/testplex/WizardsSourceMaps.tar.gz -C "$DATA_ROOT/update/maps"
 chown -R minecraft:minecraft "$DATA_ROOT/update/maps/Wizards" "$DATA_ROOT/update/maps/Nano Wizards"
 
 # Keep the persistent Paper world container so vanilla player data and plugin
-# data remain on the Fly volume. Only the seven source-map entries are symlinked
-# to image assets, keeping their large region data outside the volume.
+# data remain on the Fly volume. Install the seven compact source-map worlds as
+# real directories: Paper 26.3 rejects symlink world roots during migration.
+# Active map copies remain disposable under /tmp, while this volume copy lets
+# Paper register/migrate each source world safely.
 TESTPLEX_WORLD_OWNER=minecraft:minecraft TESTPLEX_MM_RUNTIME_ROOT=/tmp/testplex-monster-maze-runtime \
     /usr/local/bin/provision-monster-maze-worlds \
     /opt/testplex/MonsterMazeMaps "$DATA_ROOT"

@@ -18,29 +18,27 @@ if [ ! -s "$monster_maze_revision_file" ] || ! grep -Eq '^[0-9a-f]{40}$' "$monst
     echo "Fly Monster Maze packaged-world revision marker is missing or invalid." >&2
     exit 1
 fi
+installed_revision_file="$server_root/.testplex-mm-source-maps"
+if [ ! -s "$installed_revision_file" ] || ! cmp -s "$monster_maze_revision_file" "$installed_revision_file"; then
+    echo "Fly installed Monster Maze world revision does not match the packaged map set." >&2
+    exit 1
+fi
 for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-    link="$server_root/$world"
-    expected="$monster_maze_assets/$world"
-    if [ ! -L "$link" ]; then
-        echo "Fly Monster Maze world link is missing: $link" >&2
+    installed="$server_root/$world"
+    if [ ! -d "$installed" ] || [ -L "$installed" ]; then
+        echo "Fly Monster Maze world directory is missing or is still a symlink: $installed" >&2
         exit 1
     fi
-    actual_target="$(readlink -f -- "$link")"
-    expected_target="$(readlink -f -- "$expected")"
-    if [ -z "$expected_target" ] || [ "$actual_target" != "$expected_target" ]; then
-        echo "Fly Monster Maze world link points outside the packaged map assets: $link -> $actual_target" >&2
+    if [ ! -s "$installed/level.dat" ]; then
+        echo "Fly Monster Maze world is missing level.dat: $installed" >&2
         exit 1
     fi
-    if [ ! -s "$actual_target/level.dat" ]; then
-        echo "Fly Monster Maze world is missing level.dat: $actual_target" >&2
-        exit 1
-    fi
-    region="$actual_target/region"
+    region="$installed/region"
     if [ ! -d "$region" ]; then
-        region="$actual_target/dimensions/minecraft/overworld/region"
+        region="$installed/dimensions/minecraft/overworld/region"
     fi
     if [ ! -d "$region" ] || ! find "$region" -maxdepth 1 -type f -name '*.mca' -print -quit | grep -q .; then
-        echo "Fly Monster Maze world has no readable terrain regions: $actual_target" >&2
+        echo "Fly Monster Maze world has no readable terrain regions: $installed" >&2
         exit 1
     fi
 done
