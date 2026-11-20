@@ -54,7 +54,28 @@ grep -Fxq 'paper-runtime-change' "$WORLD_ROOT/mm_void/paper-migration-marker.dat
 # A new image source revision updates only the seven managed map folders.
 printf 'preserve-me\n' > "$WORLD_ROOT/world/runtime-marker.txt"
 write_source "$revision_two" second
-TESTPLEX_WORLD_OWNER= TESTPLEX_MM_RUNTIME_ROOT="$RUNTIME_ROOT" bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
+# df's free-space value already excludes the installed worlds. Simulate a
+# volume with room for the new staged maps plus reserve, but not room for the
+# old maps to be counted a second time. This is the tight-space case seen on
+# Fly and must still provision safely without touching player data.
+FAKE_BIN="$ROOT/fake-bin"
+mkdir -p "$FAKE_BIN"
+REAL_DF="$(command -v df)"
+cat > "$FAKE_BIN/df" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-Pk" ]]; then
+    source_size_kb="$(for world in $TESTPLEX_TEST_WORLD_NAMES; do du -sk -- "$TESTPLEX_TEST_SOURCE_ROOT/$world"; done | awk '{ total += $1 } END { print total + 0 }')"
+    available_kb=$((source_size_kb + TESTPLEX_MM_VOLUME_RESERVE_KB))
+    printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\nmock-volume 1000000 1 %s 1%% /\n' "$available_kb"
+else
+    exec "$TESTPLEX_REAL_DF" "$@"
+fi
+EOF
+chmod +x "$FAKE_BIN/df"
+TESTPLEX_TEST_WORLD_NAMES='mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido' \
+TESTPLEX_TEST_SOURCE_ROOT="$SOURCE" TESTPLEX_MM_VOLUME_RESERVE_KB=32768 TESTPLEX_REAL_DF="$REAL_DF" \
+PATH="$FAKE_BIN:$PATH" TESTPLEX_WORLD_OWNER= TESTPLEX_MM_RUNTIME_ROOT="$RUNTIME_ROOT" \
+    bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_two" ]]
 [[ "$(cat "$WORLD_ROOT/mm_void/level.dat")" == 'mm_void:second' ]]
 [[ ! -e "$WORLD_ROOT/mm_void/paper-migration-marker.dat" ]]
@@ -86,3 +107,4 @@ fi
 [[ "$(cat "$FOREIGN_ROOT/mm_void/keep.dat")" == 'unmanaged-world-data' ]]
 
 echo 'Monster Maze world provisioning checks passed.'
+
