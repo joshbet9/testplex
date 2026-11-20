@@ -42,6 +42,13 @@ class DragonsCommunityRulesTest {
         assertTrue(ArcadePortRules.shouldAwardDragonsSurviveFiveMinutes(300_001L));
     }
 
+    @Test void survivalScoreboardClockAdvancesAndClampsNegativeElapsedTime() {
+        assertEquals("0:00", ArcadePortRules.formatDragonsSurvivalTime(-1L));
+        assertEquals("0:00", ArcadePortRules.formatDragonsSurvivalTime(999L));
+        assertEquals("0:01", ArcadePortRules.formatDragonsSurvivalTime(1_000L));
+        assertEquals("2:05", ArcadePortRules.formatDragonsSurvivalTime(125_999L));
+    }
+
     @Test void threeWinStreakIncrementsAndAnyCompletedLossResets() {
         assertEquals(1, ArcadePortRules.nextDragonsWinStreak(0, true));
         assertEquals(2, ArcadePortRules.nextDragonsWinStreak(1, true));
