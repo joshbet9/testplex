@@ -10028,7 +10028,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if ("disruptor".equals(kit)) {
                     setDragonEscapeKitBlockCharges(player, Material.TNT, "Disruptor",
-                            "Stationary trip mine; triggers opponents on pickup after 2 seconds.", 1);
+                            "Stationary mine; opponents trigger it on pickup after 2 seconds. Sneak + right-click nearby TNT to boost in your aim direction.", 1);
                 } else if ("builder".equals(kit)) {
                     int startingBricks = Math.max(0, GameDebugRuntimeOverrides.intValue(
                             "DRAGON_ESCAPE_BUILDER_MAX_BRICKS", ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS));
@@ -18249,7 +18249,7 @@ public final class ArcadePortManager implements Listener {
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.TNT) < maxTnt) {
                         rechargeDragonEscapeKitBlock(player, Material.TNT, "Disruptor",
-                                "Stationary trip mine; triggers opponents on pickup after 2 seconds.", maxTnt);
+                                "Stationary mine; opponents trigger it on pickup after 2 seconds. Sneak + right-click nearby TNT to boost in your aim direction.", maxTnt);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextTntAt.put(id, now + interval);
