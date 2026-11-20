@@ -17193,21 +17193,13 @@ public final class ArcadePortManager implements Listener {
                         waypoint = randomDragonSkyTarget(session);
                         session.dragonTargetLocations.put(dragonId, waypoint);
                     }
-                    // Paper's podium is the End exit-portal location, not Mineplex's
-                    // arbitrary setTargetBlock destination. Steer toward the saved
-                    // map/sparkler waypoint directly, preserving a smooth flight arc.
-                    dragon.setAI(false);
-                    Vector offset = waypoint.toVector().subtract(dragon.getLocation().toVector());
-                    Vector heading = ArcadePortRules.dragonsWaypointHeading(
-                            offset, session.dragonFlightVectors.get(dragonId));
-                    session.dragonFlightVectors.put(dragonId, heading.clone());
-                    Vector flight = ArcadePortRules.autonomousDragonFlight(heading,
-                            GameDebugRuntimeOverrides.doubleValue("DRAGONS_AUTONOMOUS_FLIGHT_SPEED",
-                                    ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
-                    dragon.setVelocity(flight);
-                    Location facing = dragon.getLocation().clone();
-                    facing.setDirection(heading);
-                    dragon.setRotation(facing.getYaw(), facing.getPitch());
+                    // Keep autonomous dragons on Paper's native phase-driven flight.
+                    // Direct velocity steering with AI disabled leaves EnderDragons at spawn.
+                    dragon.setPodium(waypoint);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(false);
+                    if (dragon.getPhase() != phase) {
+                        dragon.setPhase(phase);
+                    }
                 }
             }
 
