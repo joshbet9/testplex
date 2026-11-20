@@ -10169,6 +10169,12 @@ public final class ArcadePortManager implements Listener {
                 if ("infiltrator".equals(kit)) {
                     player.getInventory().addItem(new ItemStack(Material.IRON_SWORD));
                 }
+                if ("fortifier".equals(kit)) {
+                    player.getInventory().setItem(7, namedItem(Material.BRICKS, "Fortifier Wall Pattern",
+                            "Right-click to cycle wall shapes; right-click team wool to place a wall."));
+                    player.sendMessage(ChatColor.YELLOW + "Fortifier: right-click the bricks in slot 8 to switch wall types, "
+                            + "then right-click your team wool while holding wool to place the chosen wall.");
+                }
                 break;
             }
         }
@@ -30526,6 +30532,21 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.TURF_WARS
+                && event.getAction().isRightClick()
+                && event.getItem() != null && event.getItem().getType() == Material.BRICKS
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "fortifier".equals(session.turfWarsKits.getOrDefault(
+                        event.getPlayer().getUniqueId(), "marksman"))) {
+            event.setCancelled(true);
+            TurfFortifierTemplate next = session.turfFortifierTemplatesByPlayer
+                    .getOrDefault(event.getPlayer().getUniqueId(), TurfFortifierTemplate.PANEL_2X2).next();
+            session.turfFortifierTemplatesByPlayer.put(event.getPlayer().getUniqueId(), next);
+            event.getPlayer().sendActionBar(ChatColor.YELLOW + "Fortifier wall: " + next.displayName()
+                    + ". Hold your team wool and right-click existing team wool to place it.");
+            event.getPlayer().playSound(event.getPlayer().getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.6F, 1.1F);
+            return;
+        }
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getAction() == Action.RIGHT_CLICK_BLOCK
                 && event.getClickedBlock() != null
