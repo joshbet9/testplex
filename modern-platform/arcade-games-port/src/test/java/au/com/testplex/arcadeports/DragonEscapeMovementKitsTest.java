@@ -133,43 +133,36 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void disruptorOwnerTriggersImmediatelyOnReturnContactWithoutChangingOpponentArming() {
-        assertTrue(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 1.5D, 2.0D),
-                "Owner return contact triggers immediately, without waiting for the mine's fuse age");
-        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                false, true, 1.0D, 2.0D), "A mine owned by another player is not self-triggerable");
-        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, false, 1.0D, 2.0D), "The owner must move clear before their return impact can trigger it");
-        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 2.01D, 2.0D), "Keep the existing pickup radius");
-        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, Double.NaN, 2.0D));
+    void disruptorSelfLaunchRequiresTopFaceUseOnTheSupportBlock() {
+        assertTrue(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, true, true, 0.0D));
+        assertTrue(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, true, true, 0.12D), "Small server-side position variance does not change the launch");
+        assertFalse(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                false, true, true, 0.0D), "Air clicks do not self-launch");
+        assertFalse(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, false, true, 0.0D), "Side-face placement does not self-launch");
+        assertFalse(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, true, false, 0.0D), "TNT used on any other block does not self-launch");
+        assertFalse(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, true, true, 0.5D), "A block that is not under the racer's feet is rejected");
+        assertFalse(DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                true, true, true, Double.NaN));
     }
 
     @Test
-    void disruptorSelfLaunchUsesBlastDirectionAndAddsTntLikeImpulse() {
-        Vector current = new Vector(0.2D, -0.1D, 0.0D);
-        Vector mine = new Vector(0.0D, 0.0D, 0.0D);
-        Vector above = DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                current, new Vector(0.0D, 1.0D, 0.0D), mine, 2.0D);
-        assertEquals(0.2D, above.getX(), 0.00001D);
-        assertTrue(above.getY() > 1.0D, "A mine below the player produces a strong upward launch");
-        assertEquals(0.0D, above.getZ(), 0.00001D);
-
-        Vector east = DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                new Vector(), new Vector(1.0D, 0.25D, 0.0D), mine, 2.0D);
-        assertTrue(east.getX() > 1.0D, "Position beside the mine controls horizontal launch direction");
-        assertTrue(east.getY() > 0.0D, "The blast retains an upward component");
-
-        Vector west = DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                new Vector(), new Vector(-1.0D, 0.25D, 0.0D), mine, 2.0D);
-        assertTrue(west.getX() < -1.0D, "Moving to the opposite side reverses the horizontal launch");
-        assertEquals(current, DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                current, new Vector(3.0D, 0.0D, 0.0D), mine, 2.0D),
-                "The mine has no self-launch effect outside its trigger radius");
-        assertEquals(current, DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                current, null, mine, 2.0D), "Invalid positions do not create an impulse");
+    void repeatedDisruptorUnderfootUsesAddOnePingIndependentVerticalImpulsePerTnt() {
+        Vector first = DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(new Vector());
+        Vector second = DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(first);
+        assertEquals(DragonEscapeMovementKits.DISRUPTOR_MINE_BLAST_IMPULSE, first.getY(), 0.00001D);
+        assertEquals(2.0D * first.getY(), second.getY(), 0.00001D,
+                "Two TNT uses on the support block produce twice the vertical impulse");
+        assertEquals(0.35D, DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(
+                new Vector(0.35D, -2.0D, -0.1D)).getX(), 0.00001D,
+                "The launch preserves horizontal momentum");
+        assertEquals(first.getY(), DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(
+                new Vector(0.0D, -2.0D, 0.0D)).getY(), 0.00001D,
+                "A downward fall does not cancel the upward launch");
     }
 
     @Test

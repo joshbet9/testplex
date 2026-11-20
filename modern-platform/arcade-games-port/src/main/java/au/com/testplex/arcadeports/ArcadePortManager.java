@@ -18311,23 +18311,13 @@ public final class ArcadePortManager implements Listener {
                 && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
     }
 
-    /** Remove owner tracking when the source-style dropped TNT item despawns or is removed. */
+    /** Remove owner tracking when a dropped Disruptor mine despawns or is removed. */
     private void updateDragonEscapeMines(Session session) {
-        double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
-                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
         for (UUID mineId : new ArrayList<>(session.dragonEscapeMineOwners.keySet())) {
             Entity entity = session.world.getEntity(mineId);
             if (entity == null || !entity.isValid()) {
                 session.dragonEscapeMineOwners.remove(mineId);
-                session.dragonEscapeMineOwnersDeparted.remove(mineId);
                 if (entity != null) session.entities.remove(entity);
-                continue;
-            }
-            UUID ownerId = session.dragonEscapeMineOwners.get(mineId);
-            Player owner = ownerId == null ? null : Bukkit.getPlayer(ownerId);
-            if (owner != null && owner.isOnline() && owner.getWorld() == session.world
-                    && owner.getLocation().distanceSquared(entity.getLocation()) > triggerRadius * triggerRadius) {
-                session.dragonEscapeMineOwnersDeparted.add(mineId);
             }
         }
     }
@@ -18347,32 +18337,19 @@ public final class ArcadePortManager implements Listener {
         // Cancel every pickup attempt so TNT never enters an inventory.
         event.setCancelled(true);
         if (!session.alive.contains(target.getUniqueId())) return;
-        boolean ownerSteppedOnMine = target.getUniqueId().equals(ownerId);
+        if (target.getUniqueId().equals(ownerId)) return;
         double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
                 "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
-        boolean shouldTrigger = ownerSteppedOnMine
-                ? DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                        true, session.dragonEscapeMineOwnersDeparted.contains(mine.getUniqueId()),
-                        target.getLocation().distance(mine.getLocation()), triggerRadius)
-                : ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
-                        mine.getTicksLived(), target.getLocation().distance(mine.getLocation()), false);
+        boolean shouldTrigger = ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
+                mine.getTicksLived(), target.getLocation().distance(mine.getLocation()), false);
         if (!shouldTrigger) return;
 
         session.dragonEscapeMineOwners.remove(mine.getUniqueId());
-        session.dragonEscapeMineOwnersDeparted.remove(mine.getUniqueId());
         session.entities.remove(mine);
         mine.remove();
-        if (ownerSteppedOnMine) {
-            Vector mineCenter = mine.getLocation().toVector().add(new Vector(0.0D, 0.25D, 0.0D));
-            Vector playerCenter = target.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
-            target.setVelocity(DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                    target.getVelocity(), playerCenter, mineCenter, triggerRadius));
-            target.sendActionBar(ChatColor.GREEN + "Disruptor boosted!");
-        } else {
-            target.setVelocity(new Vector(0.0D, GameDebugRuntimeOverrides.doubleValue(
-                    "DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y), 0.0D));
-            target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
-        }
+        target.setVelocity(new Vector(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y), 0.0D));
+        target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
         target.setFallDistance(0.0F);
         session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
         session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
@@ -32016,6 +31993,24 @@ public final class ArcadePortManager implements Listener {
                     && item == Material.TNT && "disruptor".equals(kit)) {
                 event.setCancelled(true);
                 if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
+                Block clicked = event.getClickedBlock();
+                Location feet = player.getLocation();
+                double feetClearance = clicked == null ? Double.NaN
+                        : player.getBoundingBox().getMinY() - clicked.getBoundingBox().getMaxY();
+                boolean underfootUse = DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
+                        event.getAction().isRightClick(), event.getBlockFace() == BlockFace.UP,
+                        clicked != null && clicked.getWorld() == player.getWorld()
+                                && clicked.getX() == feet.getBlockX() && clicked.getZ() == feet.getBlockZ(),
+                        feetClearance);
+                if (underfootUse) {
+                    consumeHeld(player);
+                    player.setVelocity(DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(
+                            player.getVelocity()));
+                    player.setFallDistance(0.0F);
+                    player.sendActionBar(ChatColor.GREEN + "Disruptor boost!");
+                    player.getWorld().playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.8F);
+                    return;
+                }
                 throwDragonEscapeMine(session, player);
                 return;
             }
