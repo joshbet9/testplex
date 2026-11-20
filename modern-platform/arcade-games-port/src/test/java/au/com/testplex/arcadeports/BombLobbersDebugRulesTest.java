@@ -56,6 +56,36 @@ class BombLobbersDebugRulesTest {
     }
 
     @Test
+    void approvedPowerupsHaveDistinctEffectsAndTimedProtectionExpires() {
+        assertEquals("Jump Boost", ArcadePortRules.bombLobbersPowerupName("jump-boost"));
+        assertEquals("TNT Multiplier", ArcadePortRules.bombLobbersPowerupName("tnt-multiplier"));
+        assertEquals("TNT Throw Strength", ArcadePortRules.bombLobbersPowerupName("throw-strength"));
+        assertEquals("Regeneration", ArcadePortRules.bombLobbersPowerupName("regeneration"));
+        assertEquals("Double Jump Boost", ArcadePortRules.bombLobbersPowerupName("double-jump-boost"));
+        assertEquals("Direct-Hit Protection", ArcadePortRules.bombLobbersPowerupName("direct-hit-protection"));
+
+        assertEquals(1.5D, ArcadePortRules.bombLobbersPowerupTntDamageMultiplier("tnt-multiplier"));
+        assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupTntDamageMultiplier("normal"));
+        assertEquals(1.4D, ArcadePortRules.bombLobbersPowerupThrowVelocityMultiplier("throw-strength"));
+        assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupThrowVelocityMultiplier("normal"));
+        assertEquals(1.35D, ArcadePortRules.bombLobbersPowerupDoubleJumpMultiplier(true));
+        assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupDoubleJumpMultiplier(false));
+
+        assertEquals(5.0D, ArcadePortRules.bombLobbersDirectHitDamageAfterProtection(10.0D, true));
+        assertEquals(10.0D, ArcadePortRules.bombLobbersDirectHitDamageAfterProtection(10.0D, false));
+        assertTrue(ArcadePortRules.bombLobbersTimedPowerupActive(1_000L, 1_001L));
+        assertFalse(ArcadePortRules.bombLobbersTimedPowerupActive(1_001L, 1_001L));
+        assertTrue(ArcadePortRules.shouldIgniteBombLobbersBlock(true, true, false, false));
+        assertFalse(ArcadePortRules.shouldIgniteBombLobbersBlock(false, true, false, false));
+        assertFalse(ArcadePortRules.shouldIgniteBombLobbersBlock(true, false, false, false));
+        assertFalse(ArcadePortRules.shouldIgniteBombLobbersBlock(true, true, true, false));
+        assertEquals(160, ArcadePortRules.bombLobbersPowerupEffectDurationTicks());
+        assertEquals(160, ArcadePortRules.bombLobbersPowerupDoubleJumpDurationTicks());
+        assertEquals(160, ArcadePortRules.bombLobbersPowerupDirectHitProtectionTicks());
+        assertEquals(500L, ArcadePortRules.bombLobbersPowerupAuraIntervalMillis());
+    }
+
+    @Test
     void powerupToggleIsProfileBackedAndConsumedByTheRuntimeRule() {
         assertTrue(ArcadePortRules.bombLobbersPowerupsEnabled());
         assertTrue(GameDebugVariableCatalog.variables(ArcadePortGame.BOMB_LOBBERS).stream()
