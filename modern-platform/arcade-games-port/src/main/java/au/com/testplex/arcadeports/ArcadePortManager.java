@@ -25383,7 +25383,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, MILESTONES, KIT_LEVELS, DRAGON_ESCAPE_MAPS,
-        DRAGON_ESCAPE_COLOURS, MONSTER_MAZE_PBS, MONSTER_MAZE_KITS }
+        DRAGON_ESCAPE_KITS,
+        DRAGON_ESCAPE_COLOURS, MONSTER_MAZE_PBS, MONSTER_MAZE_KITS, MONSTER_MAZE_LEADERBOARD }
 
     private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
@@ -26836,8 +26837,9 @@ public final class ArcadePortManager implements Listener {
             tabs.add(new Tab(Material.REDSTONE_LAMP, "Milestones", "View lifetime milestone tracks and tiers.",
                     "open-game-milestones"));
         boolean hasPbs = "dragon-escape".equals(gameId) || "monster-maze".equals(gameId);
-        boolean inPbs = current == StatsPage.DRAGON_ESCAPE_MAPS
-                || current == StatsPage.MONSTER_MAZE_PBS || current == StatsPage.MONSTER_MAZE_KITS;
+        boolean inPbs = current == StatsPage.DRAGON_ESCAPE_MAPS || current == StatsPage.DRAGON_ESCAPE_KITS
+                || current == StatsPage.MONSTER_MAZE_PBS || current == StatsPage.MONSTER_MAZE_KITS
+                || current == StatsPage.MONSTER_MAZE_LEADERBOARD;
         if (hasPbs && !inPbs)
             tabs.add(new Tab(Material.CLOCK, "Personal Bests", "View map/pattern personal bests.",
                     "dragon-escape".equals(gameId) ? "open-dragon-escape-pbs" : "open-maze-pbs"));
@@ -27159,6 +27161,27 @@ public final class ArcadePortManager implements Listener {
                         + (best == null ? "Not recorded" : best.stage));
                 if (best != null) lore.add(ChatColor.GRAY + "Best kit: " + ChatColor.WHITE + best.kit);
                 lore.add(ChatColor.AQUA + "Click to view every kit's PB.");
+                if (showStatsPlacementDetails(viewer, "monster-maze")) {
+                    List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
+                            ? List.of() : leaderboard.getLeaderboard(mode, pattern, 10_000);
+                    int rank = 1;
+                    boolean found = false;
+                    if (best != null) {
+                        for (var row : rows) {
+                            if (row.name != null && row.name.equalsIgnoreCase(targetName)) {
+                                lore.add(ChatColor.GOLD + "Pattern placement: " + ChatColor.WHITE + "#" + rank);
+                                found = true;
+                                break;
+                            }
+                            rank++;
+                        }
+                        if (!found) lore.add(ChatColor.GOLD + "Pattern placement: " + ChatColor.GRAY
+                                + "Outside loaded leaderboard");
+                        if (!rows.isEmpty()) lore.add(ChatColor.DARK_GRAY + "Top " + rows.size()
+                                + " players, best kit per player.");
+                    }
+                }
+                lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
                 inventory.setItem(11 + modeIndex * 9 + pattern * 2,
                         statsItem(best == null ? Material.GRAY_DYE : Material.LIME_DYE,
                                 mode.color + mode.id + ChatColor.WHITE + " — "
@@ -27194,17 +27217,80 @@ public final class ArcadePortManager implements Listener {
         for (int index = 0; index < kits.size(); index++) {
             var kit = kits.get(index);
             int stage = leaderboard == null ? 0 : leaderboard.getKitPB(mode, pattern, targetId, kit.id);
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
+                    + (stage > 0 ? "Stage " + stage : "Not recorded"));
+            if (showStatsPlacementDetails(viewer, "monster-maze") && stage > 0) {
+                List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
+                        ? List.of() : leaderboard.getLeaderboard(mode, pattern, 10_000);
+                int rank = 1;
+                boolean found = false;
+                for (var row : rows) {
+                    if (row.name != null && row.name.equalsIgnoreCase(targetName)
+                            && row.kit != null && row.kit.equalsIgnoreCase(kit.id)) {
+                        lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + "#" + rank);
+                        found = true;
+                        break;
+                    }
+                    rank++;
+                }
+                if (!found) lore.add(ChatColor.GOLD + "Placement: " + ChatColor.GRAY
+                        + "Not in the best-kit pattern board");
+            }
+            lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
             inventory.setItem(18 + columns.get(index),
                     statsItem(kit.icon, kit.display,
-                            List.of(" ", ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
-                                    + (stage > 0 ? "Stage " + stage : "Not recorded"),
-                                    ChatColor.GRAY + "Saved for this mode, pattern and kit."),
-                            "noop", null, "monster-maze"));
+                            lore,
+                            "open-maze-kit-leaderboard", modeIndex + ":" + pattern + ":" + kit.id, "monster-maze"));
         }
+        inventory.setItem(8, statsItem(showStatsPlacementDetails(viewer, "monster-maze")
+                        ? Material.LIME_DYE : Material.GRAY_DYE,
+                ChatColor.AQUA + "Placements: "
+                        + (showStatsPlacementDetails(viewer, "monster-maze") ? "Shown" : "Hidden"),
+                List.of(ChatColor.GRAY + "Shift-left-click to toggle pattern placements."),
+                "toggle-monster-maze-placement", selection, "monster-maze"));
         inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
                 List.of(ChatColor.GRAY + "Return to Monster Maze pattern PBs."),
                 "back-maze-pbs", null, "monster-maze"));
         addStatsTabFooter(inventory, "monster-maze", StatsPage.MONSTER_MAZE_KITS);
+        viewer.openInventory(inventory);
+    }
+
+    private void openMonsterMazeKitLeaderboard(Player viewer, UUID targetId, String targetName,
+            String selection, int returnAchievementPage, boolean incompleteOnly) {
+        if (selection == null || !selection.matches("0:[0-2]:[a-z0-9_-]+")) return;
+        int pattern = selection.charAt(2) - '0';
+        int kitStart = selection.indexOf(':', 2) + 1;
+        String kitId = selection.substring(kitStart);
+        var mode = me.monstermaze.game.MazeMode.MODERN;
+        var kit = java.util.Arrays.stream(me.monstermaze.kit.KitType.values())
+                .filter(candidate -> candidate.id.equalsIgnoreCase(kitId)).findFirst().orElse(null);
+        if (kit == null) return;
+        var manager = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
+        List<me.monstermaze.stats.LeaderboardManager.OverallEntry> rows = manager == null
+                ? List.of() : manager.getModeAndKitLeaderboard(mode, kit, 36);
+        Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_LEADERBOARD, targetId, targetName,
+                kit.display + " Kit — All Mazes", "monster-maze", returnAchievementPage,
+                incompleteOnly, pattern, 0);
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to this maze's kit PBs."),
+                "back-maze-kit-leaderboard", "0:" + pattern, "monster-maze"));
+        inventory.setItem(4, statsItem(kit.icon, ChatColor.GOLD + kit.display + " — " + mode.id,
+                List.of(ChatColor.GRAY + "Best recorded result for this kit across all mazes."),
+                "noop", null, "monster-maze"));
+        for (int i = 0; i < rows.size() && i < 36; i++) {
+            var row = rows.get(i);
+            String playerName = row.name == null || row.name.isBlank() ? "Unknown Player" : row.name;
+            List<String> lore = List.of(ChatColor.YELLOW + "Best stage: " + ChatColor.WHITE + row.stage,
+                    ChatColor.GRAY + "Maze: " + me.monstermaze.stats.LeaderboardManager.patternName(row.pattern));
+            ItemStack head = statsItem(Material.PLAYER_HEAD,
+                    ChatColor.GOLD + "#" + (i + 1) + " " + playerName, lore, "noop", null, null);
+            inventory.setItem(9 + i, head);
+        }
+        if (rows.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
+                ChatColor.YELLOW + "No recorded kit scores", List.of(), "noop", null, null));
+        addStatsTabFooter(inventory, "monster-maze", StatsPage.MONSTER_MAZE_LEADERBOARD);
         viewer.openInventory(inventory);
     }
 
@@ -27254,7 +27340,7 @@ public final class ArcadePortManager implements Listener {
                         + rank.participants() + " players.");
             }
             lore.add(" ");
-            lore.add(ChatColor.AQUA + "Right-click: View local PB leaderboard");
+            lore.add(ChatColor.AQUA + "Click: Choose a kit and view its PB");
             lore.add(ChatColor.YELLOW + "Shift-left-click: "
                     + (placementDetails ? "Hide" : "Show") + " placements");
             inventory.setItem(9 + i - start, statsItem(Material.PAPER,
@@ -27279,6 +27365,58 @@ public final class ArcadePortManager implements Listener {
             inventory.setItem(ArcadeStatsLayout.NEXT,
                     statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page →", List.of(),
                             "open-dragon-pb-page", Integer.toString(page + 1), "dragon-escape"));
+        viewer.openInventory(inventory);
+    }
+
+    private void openDragonEscapeKitBests(Player viewer, UUID targetId, String targetName,
+            String mapResource, int returnAchievementPage, boolean incompleteOnly, int selectedView) {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
+        int mapIndex = -1;
+        SourceMapCatalog.MapArchive selectedMap = null;
+        for (int i = 0; i < maps.size(); i++) {
+            if (maps.get(i).resource().equals(mapResource)) {
+                mapIndex = i;
+                selectedMap = maps.get(i);
+                break;
+            }
+        }
+        if (selectedMap == null) return;
+        boolean placementDetails = showStatsPlacementDetails(viewer, "dragon-escape");
+        List<UUID> recordedPlayers = placementDetails ? dragonEscapePbRecordedPlayers() : List.of();
+        Inventory inventory = createStatsInventory(StatsPage.DRAGON_ESCAPE_KITS, targetId, targetName,
+                selectedMap.displayName() + " Kit Personal Bests", "dragon-escape",
+                returnAchievementPage, incompleteOnly, mapIndex, selectedView);
+        List<String> kits = DragonEscapePersonalBestViews.all().stream()
+                .filter(kit -> !DragonEscapePersonalBestViews.BEST_TIME.equals(kit)).toList();
+        List<Integer> slots = ArcadeStatsLayout.columns(kits.size());
+        for (int i = 0; i < kits.size(); i++) {
+            String kit = kits.get(i);
+            long pb = dragonEscapeKitPersonalBestMillis(targetId, mapResource, kit);
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
+                    + (pb > 0L ? ArcadePortRules.formatDragonEscapeTime(pb) : "Not completed yet"));
+            if (placementDetails) {
+                ArcadeStatsPlacement.Result rank = dragonEscapeMapPlacement(
+                        targetId, mapResource, kit, recordedPlayers);
+                lore.add(ChatColor.GOLD + "Kit placement: " + statsPlacementLabel(rank));
+                if (rank != null) lore.add(ChatColor.DARK_GRAY + "Recorded kit times: "
+                        + rank.participants() + " players.");
+            }
+            lore.add(ChatColor.AQUA + "Click to view this kit's map leaderboard.");
+            inventory.setItem(18 + slots.get(i), statsItem(DragonEscapePersonalBestViews.icon(kit),
+                    ChatColor.AQUA + DragonEscapePersonalBestViews.name(kit), lore,
+                    "open-dragon-pb-kit-leaderboard", kit, "dragon-escape"));
+        }
+        inventory.setItem(8, statsItem(placementDetails ? Material.LIME_DYE : Material.GRAY_DYE,
+                ChatColor.AQUA + "Placements: " + (placementDetails ? "Shown" : "Hidden"),
+                List.of(ChatColor.GRAY + "Shift-left-click to "
+                        + (placementDetails ? "hide" : "show") + " Testplex kit placements."),
+                "toggle-dragon-pb-kit-placement", mapResource, "dragon-escape"));
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Dragon Escape maps."),
+                "back-dragon-pb-kits", Integer.toString(mapIndex), "dragon-escape"));
+        addStatsTabFooter(inventory, "dragon-escape", StatsPage.DRAGON_ESCAPE_KITS);
         viewer.openInventory(inventory);
     }
 
@@ -34190,9 +34328,16 @@ public final class ArcadePortManager implements Listener {
             String action = item.getItemMeta().getPersistentDataContainer()
                     .get(statsActionKey, PersistentDataType.STRING);
             if ("pb-board-back".equals(action)) {
-                openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
-                        holder.returnAchievementPage, holder.incompleteOnly,
-                        holder.mapPage, holder.selectedView);
+                List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
+                if (holder.mapPage >= 0 && holder.mapPage < maps.size()) {
+                    openDragonEscapeKitBests(player, holder.targetId, holder.targetName,
+                            maps.get(holder.mapPage).resource(), holder.returnAchievementPage,
+                            holder.incompleteOnly, holder.selectedView);
+                } else {
+                    openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                            holder.returnAchievementPage, holder.incompleteOnly,
+                            0, holder.selectedView);
+                }
             } else if ("pb-board-view".equals(action)) {
                 openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
                         holder.mapResource, holder.returnAchievementPage, holder.incompleteOnly,
@@ -34241,11 +34386,17 @@ public final class ArcadePortManager implements Listener {
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
                 case "toggle-placement-details" -> {
-                    if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS && event.isRightClick()
-                            && !event.isShiftClick() && category != null) {
-                        openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
-                                category, holder.achievementPage, holder.incompleteOnly,
-                                holder.menuPage, holder.dragonPbView, false, 0);
+                    if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS && category != null) {
+                        if (event.isShiftClick() && event.isLeftClick()) {
+                            toggleStatsPlacementDetails(player, "dragon-escape");
+                            openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                                    holder.achievementPage, holder.incompleteOnly,
+                                    holder.menuPage, holder.dragonPbView);
+                        } else {
+                            openDragonEscapeKitBests(player, holder.targetId, holder.targetName,
+                                    category, holder.achievementPage, holder.incompleteOnly,
+                                    holder.dragonPbView);
+                        }
                         return;
                     }
                     // Other normal clicks on the logo and PB map papers remain inert.
@@ -34260,6 +34411,31 @@ public final class ArcadePortManager implements Listener {
                                 holder.achievementPage, holder.incompleteOnly,
                                 holder.menuPage, holder.dragonPbView);
                     }
+                }
+                case "open-dragon-pb-kit-leaderboard" -> {
+                    if (category == null || holder.menuPage < 0) return;
+                    List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
+                    if (holder.menuPage >= maps.size()) return;
+                    int kitView = DragonEscapePersonalBestViews.all().indexOf(category);
+                    if (kitView < 0) return;
+                    openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                            maps.get(holder.menuPage).resource(), holder.achievementPage, holder.incompleteOnly,
+                            holder.menuPage, kitView, false, 0);
+                }
+                case "toggle-dragon-pb-kit-placement" -> {
+                    if (!event.isShiftClick() || !event.isLeftClick() || category == null) return;
+                    toggleStatsPlacementDetails(player, "dragon-escape");
+                    openDragonEscapeKitBests(player, holder.targetId, holder.targetName, category,
+                            holder.achievementPage, holder.incompleteOnly, holder.dragonPbView);
+                }
+                case "back-dragon-pb-kits" -> {
+                    int mapIndex = 0;
+                    try { mapIndex = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                            holder.achievementPage, holder.incompleteOnly,
+                            Math.max(0, mapIndex / ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE),
+                            holder.dragonPbView);
                 }
                 case "toggle-game-filter" -> openGameStats(player, holder.targetId, holder.targetName,
                         gameId, holder.achievementPage, !holder.incompleteOnly);
@@ -34299,8 +34475,28 @@ public final class ArcadePortManager implements Listener {
                 }
                 case "open-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId,
                         holder.targetName, holder.achievementPage, holder.incompleteOnly);
-                case "open-maze-kits" -> openMonsterMazeKitBests(player, holder.targetId,
-                        holder.targetName, category, holder.achievementPage, holder.incompleteOnly);
+                case "open-maze-kits" -> {
+                    if (event.isShiftClick() && event.isLeftClick()) {
+                        toggleStatsPlacementDetails(player, "monster-maze");
+                        openMonsterMazePersonalBests(player, holder.targetId, holder.targetName,
+                                holder.achievementPage, holder.incompleteOnly);
+                    } else {
+                        openMonsterMazeKitBests(player, holder.targetId,
+                                holder.targetName, category, holder.achievementPage, holder.incompleteOnly);
+                    }
+                }
+                case "toggle-monster-maze-placement" -> {
+                    if (!event.isShiftClick() || !event.isLeftClick()) return;
+                    toggleStatsPlacementDetails(player, "monster-maze");
+                    openMonsterMazeKitBests(player, holder.targetId, holder.targetName, category,
+                            holder.achievementPage, holder.incompleteOnly);
+                }
+                case "open-maze-kit-leaderboard" -> openMonsterMazeKitLeaderboard(player,
+                        holder.targetId, holder.targetName, category,
+                        holder.achievementPage, holder.incompleteOnly);
+                case "back-maze-kit-leaderboard" -> openMonsterMazeKitBests(player,
+                        holder.targetId, holder.targetName, category,
+                        holder.achievementPage, holder.incompleteOnly);
                 case "back-maze" -> openGameStats(player, holder.targetId, holder.targetName,
                         "monster-maze", holder.achievementPage, holder.incompleteOnly);
                 case "back-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId,
