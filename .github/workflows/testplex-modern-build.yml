@@ -166,12 +166,16 @@ jobs:
             echo retained > /tmp/testplex-ci-server/world/playerdata/preserve.dat
             /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-server
             test "$(cat /tmp/testplex-ci-server/.testplex-mm-source-maps)" = "$(cat /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps)"
-            test -L /tmp/testplex-ci-server/mm_void
+            test -d /tmp/testplex-ci-server/mm_void
+            test ! -L /tmp/testplex-ci-server/mm_void
             mkdir -p /tmp/testplex-ci-runtime/mm_void
             rm -f /tmp/testplex-ci-server/mm_void
             ln -s /tmp/testplex-ci-runtime/mm_void /tmp/testplex-ci-server/mm_void
             TESTPLEX_MM_RUNTIME_ROOT=/tmp/testplex-ci-runtime /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-server
-            test "$(readlink -f /tmp/testplex-ci-server/mm_void)" = "$(readlink -f /opt/testplex/MonsterMazeMaps/mm_void)"
+            test -d /tmp/testplex-ci-server/mm_void
+            test ! -L /tmp/testplex-ci-server/mm_void
+            test "$(cat /tmp/testplex-ci-server/mm_void/level.dat)" = "$(cat /opt/testplex/MonsterMazeMaps/mm_void/level.dat)"
+            test -s /tmp/testplex-ci-server/mm_void/region/r.0.0.mca
             test "$(cat /tmp/testplex-ci-server/world/playerdata/preserve.dat)" = retained
           '
 
