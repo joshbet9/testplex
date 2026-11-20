@@ -133,17 +133,18 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void disruptorCanSelfTriggerAnArmedMineWithoutSneakingWithinExistingPickupRadius() {
+    void disruptorOwnerTriggersImmediatelyOnReturnContactWithoutChangingOpponentArming() {
         assertTrue(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, 40, 1.5D, 40, 2.0D));
+                true, true, 1.5D, 2.0D),
+                "Owner return contact triggers immediately, without waiting for the mine's fuse age");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                false, 40, 1.0D, 40, 2.0D), "A mine owned by another player is not self-triggerable");
+                false, true, 1.0D, 2.0D), "A mine owned by another player is not self-triggerable");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, 39, 1.0D, 40, 2.0D), "An unarmed mine cannot launch its owner");
+                true, false, 1.0D, 2.0D), "The owner must move clear before their return impact can trigger it");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, 40, 2.01D, 40, 2.0D), "Keep the existing pickup radius");
+                true, true, 2.01D, 2.0D), "Keep the existing pickup radius");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, 40, Double.NaN, 40, 2.0D));
+                true, true, Double.NaN, 2.0D));
     }
 
     @Test

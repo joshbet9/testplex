@@ -779,6 +779,7 @@ class SessionState {
     final Map<String, Long> dragonEscapeBlockRestoreTokens = new HashMap<>();
     long dragonEscapeBlockRestoreSequence;
     final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();
+    final Set<UUID> dragonEscapeMineOwnersDeparted = new HashSet<>();
     String dragonEscapeMapName = "";
     String dragonEscapeMapResource;
     Location dragonEscapeStartLocation;

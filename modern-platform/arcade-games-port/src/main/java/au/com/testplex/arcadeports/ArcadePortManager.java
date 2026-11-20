@@ -17763,8 +17763,9 @@ public final class ArcadePortManager implements Listener {
         // subject to the normal pickup event; it is not a primed explosive.
         Item mine = session.world.dropItem(player.getEyeLocation(), new ItemStack(Material.TNT));
         mine.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-        // Keep the TNT item visible for the whole 40-tick arming period.
-        mine.setPickupDelay(40);
+        // Keep the TNT visible and detect the owner's return contact immediately.
+        // Opponents still use the original 40-tick arming rule in the pickup handler.
+        mine.setPickupDelay(0);
         session.entities.add(mine);
         session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
@@ -18278,11 +18279,21 @@ public final class ArcadePortManager implements Listener {
 
     /** Remove owner tracking when the source-style dropped TNT item despawns or is removed. */
     private void updateDragonEscapeMines(Session session) {
+        double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
         for (UUID mineId : new ArrayList<>(session.dragonEscapeMineOwners.keySet())) {
             Entity entity = session.world.getEntity(mineId);
             if (entity == null || !entity.isValid()) {
                 session.dragonEscapeMineOwners.remove(mineId);
+                session.dragonEscapeMineOwnersDeparted.remove(mineId);
                 if (entity != null) session.entities.remove(entity);
+                continue;
+            }
+            UUID ownerId = session.dragonEscapeMineOwners.get(mineId);
+            Player owner = ownerId == null ? null : Bukkit.getPlayer(ownerId);
+            if (owner != null && owner.isOnline() && owner.getWorld() == session.world
+                    && owner.getLocation().distanceSquared(entity.getLocation()) > triggerRadius * triggerRadius) {
+                session.dragonEscapeMineOwnersDeparted.add(mineId);
             }
         }
     }
@@ -18307,14 +18318,14 @@ public final class ArcadePortManager implements Listener {
                 "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
         boolean shouldTrigger = ownerSteppedOnMine
                 ? DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                        true, mine.getTicksLived(), target.getLocation().distance(mine.getLocation()),
-                        GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS",
-                                ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS), triggerRadius)
+                        true, session.dragonEscapeMineOwnersDeparted.contains(mine.getUniqueId()),
+                        target.getLocation().distance(mine.getLocation()), triggerRadius)
                 : ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
                         mine.getTicksLived(), target.getLocation().distance(mine.getLocation()), false);
         if (!shouldTrigger) return;
 
         session.dragonEscapeMineOwners.remove(mine.getUniqueId());
+        session.dragonEscapeMineOwnersDeparted.remove(mine.getUniqueId());
         session.entities.remove(mine);
         mine.remove();
         if (ownerSteppedOnMine) {
