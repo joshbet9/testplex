@@ -133,6 +133,42 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void disruptorCanOnlySelfTriggerAnArmedMineWhileSneakingWithinExistingPickupRadius() {
+        assertTrue(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                true, true, 40, 1.5D, 40, 2.0D));
+        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                false, true, 40, 1.0D, 40, 2.0D), "A mine owned by another player is not self-triggerable");
+        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                true, false, 40, 1.0D, 40, 2.0D), "Sneaking distinguishes boost activation from placement");
+        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                true, true, 39, 1.0D, 40, 2.0D), "An unarmed mine cannot launch its owner");
+        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                true, true, 40, 2.01D, 40, 2.0D), "Keep the existing pickup radius");
+        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                true, true, 40, Double.NaN, 40, 2.0D));
+    }
+
+    @Test
+    void disruptorSelfBoostUsesFullAimVectorAndKeepsSpeedCapped() {
+        assertEquals(0.9D, DragonEscapeMovementKits.DISRUPTOR_SELF_BOOST_SPEED, 0.00001D);
+        Vector east = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(1, 0, 0));
+        assertEquals(0.9D, east.getX(), 0.00001D);
+        assertEquals(0.0D, east.getY(), 0.00001D);
+        assertEquals(0.0D, east.getZ(), 0.00001D);
+
+        Vector up = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(0, 1, 0));
+        assertEquals(0.0D, up.getX(), 0.00001D);
+        assertEquals(0.9D, up.getY(), 0.00001D);
+        assertEquals(0.0D, up.getZ(), 0.00001D);
+
+        Vector diagonal = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(1, 1, 1));
+        assertEquals(0.9D, diagonal.length(), 0.00001D);
+        assertTrue(diagonal.getX() > 0.0D && diagonal.getY() > 0.0D && diagonal.getZ() > 0.0D);
+        assertEquals(0.0D, DragonEscapeMovementKits.disruptorSelfBoostVelocity(null).length(), 0.00001D);
+        assertEquals(0.0D, DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector()).length(), 0.00001D);
+    }
+
+    @Test
     void dragonEscapeVisibilityAndGhostControlsUseSeparateHotbarSlots() {
         assertEquals(4, DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT);
         assertEquals(8, DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);
