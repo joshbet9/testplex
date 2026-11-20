@@ -240,6 +240,26 @@ final class DragonEscapeMovementKits {
     }
 
     /**
+     * Shift the latched position slightly out of the contacted block. Paper can
+     * report the player a fraction inside a wall after a collision; pinning that
+     * exact location leaves the client fighting collision correction every move.
+     * The clearance stays inside TOUCH_TOLERANCE so the wall remains eligible
+     * for a kick while the player box no longer overlaps it.
+     */
+    static final double WALL_CLING_WALL_CLEARANCE = 0.04D;
+
+    static Location wallClingAnchor(Location contact, Vector wallNormal) {
+        if (contact == null) return null;
+        Location anchor = contact.clone();
+        if (wallNormal == null || !Double.isFinite(wallNormal.getX())
+                || !Double.isFinite(wallNormal.getY()) || !Double.isFinite(wallNormal.getZ())) return anchor;
+        Vector outward = wallNormal.clone().setY(0.0D);
+        if (outward.lengthSquared() < 1.0E-8D) return anchor;
+        anchor.add(outward.normalize().multiply(WALL_CLING_WALL_CLEARANCE));
+        return anchor;
+    }
+
+    /**
      * Cling is a full position latch, not just a fixed Y coordinate. Movement
      * keys must never walk the player off a wall; only mouse look changes while
      * latched. A fresh Space press is handled separately by wallKickVelocity.
