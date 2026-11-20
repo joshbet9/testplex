@@ -15,6 +15,7 @@ final class ArcadeAchievementKitRequirements {
     private static final Map<String, Requirement> KNOWN = Map.ofEntries(
             one("death-tag", "runner-turtle", "turtle-shell"),
             one("death-tag", "runner-trickster", "smoke-and-mirrors"),
+            one("bomb-lobbers", "pitcher", "two-birds-one-stone"),
             one("dragons", "tamer", "dragon-tamer"),
             one("dragon-escape", "builder", "paralympics"),
             Map.entry("dragon-escape/digger", new Requirement(false,

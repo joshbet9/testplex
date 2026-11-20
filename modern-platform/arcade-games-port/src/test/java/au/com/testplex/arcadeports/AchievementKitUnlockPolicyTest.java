@@ -72,6 +72,11 @@ class AchievementKitUnlockPolicyTest {
         assertFalse(constructor.requirements().contains("not-on-my-watch"));
         assertFalse(constructor.unlocked(Set.of("blast-proof", "jelly-skin")::contains));
         assertTrue(constructor.unlocked(Set.copyOf(constructor.requirements())::contains));
+
+        var pitcher = AchievementKitUnlockPolicy.find(ArcadePortGame.BOMB_LOBBERS, "pitcher");
+        assertEquals(java.util.List.of("two-birds-one-stone"), pitcher.requirements());
+        assertFalse(pitcher.requirements().contains("pitcher"));
+        assertTrue(pitcher.unlocked(Set.of("two-birds-one-stone")::contains));
         AchievementKitUnlockPolicy.Rule digger = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "digger");
         Set<String> earned = new HashSet<>(Set.of("to-hell-and-back"));
         assertEquals(java.util.List.of("skylands-master", "plundered"), digger.missing(earned::contains));

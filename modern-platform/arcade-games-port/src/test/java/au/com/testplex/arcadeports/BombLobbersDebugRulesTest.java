@@ -18,6 +18,12 @@ class BombLobbersDebugRulesTest {
     }
 
     @Test
+    void pitcherIsARecognisedAchievementKitAndInheritsTeamArmor() {
+        assertEquals("pitcher", ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
+        assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("pitcher"));
+    }
+
+    @Test
     void scoreboardMatchesTheSourceRosterCutoffWithoutPowerupRows() {
         assertTrue(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(12));
         assertFalse(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(13));

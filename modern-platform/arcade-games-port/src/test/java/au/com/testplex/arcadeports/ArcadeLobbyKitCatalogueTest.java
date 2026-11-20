@@ -72,7 +72,7 @@ class ArcadeLobbyKitCatalogueTest {
 
     @Test
     void preservesTheReviewedBombLobbersKitOrder() {
-        assertEquals(List.of("acrobat", "armorer", "constructor"),
+        assertEquals(List.of("acrobat", "armorer", "constructor", "pitcher"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()
                         .map(choice -> choice.id).toList());
     }
@@ -143,7 +143,7 @@ class ArcadeLobbyKitCatalogueTest {
 
     @Test
     void configuredKitOrderMovesKnownEntriesAndKeepsUnlistedCatalogueOrder() {
-        assertEquals(List.of("constructor", "acrobat", "armorer"),
+        assertEquals(List.of("constructor", "acrobat", "armorer", "pitcher"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of(),
                         List.of("constructor", "not-a-kit", "acrobat")).stream()
                         .map(choice -> choice.id).toList());

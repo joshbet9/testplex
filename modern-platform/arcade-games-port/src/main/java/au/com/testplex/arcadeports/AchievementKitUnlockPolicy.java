@@ -93,6 +93,8 @@ final class AchievementKitUnlockPolicy {
         // Reviewed four-achievement Constructor gate; all four can be earned without the kit.
         add(rules, "bomb-lobbers", "constructor", "Constructor", "two-birds-one-stone",
                 "whats-a-double-jump", "blast-proof", "jelly-skin");
+        // Two Birds, One Stone can be earned with the existing kits, so Pitcher never requires itself.
+        add(rules, "bomb-lobbers", "pitcher", "Pitcher", "two-birds-one-stone");
         add(rules, "death-tag", "runner-turtle", "Runner Turtle", "lots-of-subject-matter");
         add(rules, "death-tag", "runner-trickster", "Runner Trickster", "smoke-and-mirrors");
         add(rules, "dragons", "tamer", "Tamer", "dragon-tamer");

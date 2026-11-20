@@ -94,7 +94,9 @@ final class ArcadeLobbyKitCatalogue {
                             Material.IRON_BOOTS, Material.IRON_LEGGINGS,
                             Material.IRON_CHESTPLATE, Material.IRON_HELMET),
                     choice("constructor", "Constructor", Material.BRICKS,
-                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS));
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS),
+                    choice("pitcher", "Pitcher", Material.TNT,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.TNT));
             case DEATH_TAG -> List.of(
                     choice("runner-basher", "Runner Basher", Material.IRON_SWORD,
                             Unlock.FREE, Zombie.class, Material.IRON_SWORD),

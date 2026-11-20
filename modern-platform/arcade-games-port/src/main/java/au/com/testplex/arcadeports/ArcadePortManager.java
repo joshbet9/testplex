@@ -9997,7 +9997,11 @@ public final class ArcadePortManager implements Listener {
             }
             case BOMB_LOBBERS: {
                 String kit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "acrobat");
-                player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Click to throw at enemy players.", 1));
+                boolean pitcher = "pitcher".equals(kit);
+                player.getInventory().addItem(namedItem(Material.TNT,
+                        pitcher ? "Pitcher TNT" : "Throwing TNT",
+                        pitcher ? "Aim toward an opposing island; the throw adjusts to land on its blocks."
+                                : "Click to throw at enemy players.", 1));
                 switch (kit) {
                     case "armorer":
                         break;
@@ -12183,7 +12187,7 @@ public final class ArcadePortManager implements Listener {
                     new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET)
             };
         } else if (ArcadePortRules.bombLobbersKitUsesTeamArmor(kit)) {
-            // The source TeamArmorModule runs during PlayerKitGiveEvent for Acrobat/Constructor.
+            // The source TeamArmorModule runs during PlayerKitGiveEvent for Acrobat/Constructor/Pitcher.
             armor = new ItemStack[] {
                     bombLobbersTeamArmorPiece(Material.LEATHER_BOOTS, teamColor, chatColor),
                     bombLobbersTeamArmorPiece(Material.LEATHER_LEGGINGS, teamColor, chatColor),
@@ -35416,6 +35420,70 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /**
+     * Selects a clear top surface on the opposing island close to the thrower's aim
+     * lane, then nudges the throw just enough to reach that surface with the familiar arc.
+     */
+    private Vector bombLobbersPitcherVelocity(Session session, Player player, Location origin, Vector normalVelocity) {
+        int ownTeam = session.teams.getOrDefault(player.getUniqueId(), -1);
+        int opponentTeam = session.bombTeamSpawnCentres.keySet().stream()
+                .filter(team -> team != ownTeam).findFirst().orElse(-1);
+        if (opponentTeam < 0 || origin == null || origin.getWorld() != session.world) return normalVelocity;
+
+        Location opponentCentre = session.bombTeamSpawnCentres.get(opponentTeam);
+        if (opponentCentre == null) return normalVelocity;
+        List<Location> surfaces = session.bombLobbersPitcherLandingSurfaces.computeIfAbsent(
+                opponentTeam, ignored -> scanBombLobbersPitcherLandingSurfaces(session, opponentTeam));
+        if (surfaces.isEmpty()) return normalVelocity;
+
+        Vector look = player.getLocation().getDirection().setY(0.0D);
+        if (look.lengthSquared() < 1.0E-6D) {
+            look = opponentCentre.toVector().subtract(origin.toVector()).setY(0.0D);
+        }
+        if (look.lengthSquared() < 1.0E-6D) return normalVelocity;
+        look.normalize();
+
+        Location bestTarget = null;
+        Vector bestVelocity = null;
+        double bestScore = Double.POSITIVE_INFINITY;
+        for (Location surface : surfaces) {
+            Vector toward = surface.toVector().subtract(origin.toVector()).setY(0.0D);
+            double distance = toward.length();
+            if (distance < 2.0D || distance > 64.0D) continue;
+            Vector direction = toward.multiply(1.0D / distance);
+            double alignment = look.dot(direction);
+            if (alignment <= 0.0D) continue;
+            Vector corrected = BombLobbersPitcherTrajectory.velocityToTarget(
+                    direction, normalVelocity, distance, surface.getY() - origin.getY());
+            if (corrected == null) continue;
+            double adjustment = corrected.clone().subtract(normalVelocity).lengthSquared();
+            double score = (1.0D - alignment) * 100.0D + adjustment;
+            if (score < bestScore) {
+                bestScore = score;
+                bestTarget = surface;
+                bestVelocity = corrected;
+            }
+        }
+        return bestTarget == null ? normalVelocity : bestVelocity;
+    }
+
+    private List<Location> scanBombLobbersPitcherLandingSurfaces(Session session, int team) {
+        Location centre = session.bombTeamSpawnCentres.get(team);
+        if (centre == null || centre.getWorld() != session.world) return List.of();
+        List<Location> surfaces = new ArrayList<>();
+        int radius = 18;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                Block top = session.world.getHighestBlockAt(centre.getBlockX() + dx, centre.getBlockZ() + dz);
+                if (!top.getType().isSolid() || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
+                Location surface = new Location(session.world,
+                        top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
+                if (nearestBombLobbersSpawnTeam(session, surface) == team) surfaces.add(surface);
+            }
+        }
+        return List.copyOf(surfaces);
+    }
+
     private boolean throwBombLobbersTnt(Session session, Player player) {
         if (active != session || session.type != ArcadePortGame.BOMB_LOBBERS
                 || player == null || !player.isOnline()
@@ -35444,6 +35512,9 @@ public final class ArcadePortManager implements Listener {
         bomb.setYield("super-tnt".equals(powerupType) ? 6.0F : 4.0F);
         Vector velocity = player.getLocation().getDirection().normalize().multiply(2.0D);
         velocity.setY(velocity.getY() + 0.1D);
+        if ("pitcher".equals(session.bombLobbersKits.getOrDefault(ownerId, "acrobat"))) {
+            velocity = bombLobbersPitcherVelocity(session, player, spawn, velocity);
+        }
         bomb.setVelocity(velocity);
         session.entities.add(bomb);
         session.bombOwners.put(bomb.getUniqueId(), ownerId);
@@ -36742,6 +36813,7 @@ public final class ArcadePortManager implements Listener {
         final Map<Block, BaconDashFireState> baconDashFireBlocks = new HashMap<>();
         final Map<BaconHitPair, Long> baconLastHitAtByPair = new HashMap<>();
         final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
+        final Map<Integer, List<Location>> bombLobbersPitcherLandingSurfaces = new HashMap<>();
         final Map<UUID, TurfWarsInfiltration> turfInfiltration = new HashMap<>();
         final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
         final Map<UUID, MicroPlacedBlockKnock> microPlacedBlockKnocks = new HashMap<>();
