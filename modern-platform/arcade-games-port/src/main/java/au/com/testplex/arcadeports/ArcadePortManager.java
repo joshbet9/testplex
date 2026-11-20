@@ -10032,7 +10032,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if ("disruptor".equals(kit)) {
                     setDragonEscapeKitBlockCharges(player, Material.TNT, "Disruptor",
-                            "Stationary mine; opponents trigger it on pickup after 2 seconds. Right-click nearby armed TNT to launch from its blast.", 1);
+                            "Step onto your armed mine from the side you want to launch toward. Opponents still trigger it when they step on it.", 1);
                 } else if ("builder".equals(kit)) {
                     int startingBricks = Math.max(0, GameDebugRuntimeOverrides.intValue(
                             "DRAGON_ESCAPE_BUILDER_MAX_BRICKS", ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS));
@@ -17755,53 +17755,6 @@ public final class ArcadePortManager implements Listener {
         return bestIndex;
     }
 
-    /**
-     * Right-clicking with TNT beside an armed mine triggers it as a TNT jump.
-     * Standing/aiming around the mine controls the blast angle. If no armed
-     * mine is nearby, the same right-click remains the ordinary mine placement.
-     */
-    private boolean useDragonEscapeDisruptorSelfBoost(Session session, Player player) {
-        UUID ownerId = player.getUniqueId();
-        int armTicks = Math.max(0, GameDebugRuntimeOverrides.intValue(
-                "DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS));
-        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
-                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
-        Item nearest = null;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (Map.Entry<UUID, UUID> mineEntry : session.dragonEscapeMineOwners.entrySet()) {
-            if (!ownerId.equals(mineEntry.getValue())) continue;
-            Entity entity = session.world.getEntity(mineEntry.getKey());
-            if (!(entity instanceof Item mine) || !mine.isValid()) continue;
-            double distance = player.getLocation().distance(mine.getLocation());
-            if (!DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                    true, mine.getTicksLived(), distance, armTicks, radius)) continue;
-            if (distance < nearestDistance) {
-                nearest = mine;
-                nearestDistance = distance;
-            }
-        }
-        if (nearest == null) {
-            return false;
-        }
-
-        Vector mineCenter = nearest.getLocation().toVector().add(new Vector(0.0D, 0.25D, 0.0D));
-        Vector playerCenter = player.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
-        Vector launch = DragonEscapeMovementKits.disruptorMineBlastVelocity(
-                player.getVelocity(), playerCenter, mineCenter, radius);
-        if (!Double.isFinite(launch.getX()) || !Double.isFinite(launch.getY())
-                || !Double.isFinite(launch.getZ())) return false;
-        session.dragonEscapeMineOwners.remove(nearest.getUniqueId());
-        session.entities.remove(nearest);
-        nearest.remove();
-        player.setVelocity(launch);
-        player.setFallDistance(0.0F);
-        player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.4F);
-        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(),
-                10, 0.18D, 0.18D, 0.18D, 0.025D);
-        player.sendActionBar(ChatColor.GREEN + "Disruptor boosted!");
-        return true;
-    }
-
     private void throwDragonEscapeMine(Session session, Player player) {
         if (inventoryCount(player, Material.TNT) <= 0) {
             player.sendMessage(ChatColor.YELLOW + "Your next mini explosive is still recharging.");
@@ -18256,7 +18209,7 @@ public final class ArcadePortManager implements Listener {
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.TNT) < maxTnt) {
                         rechargeDragonEscapeKitBlock(player, Material.TNT, "Disruptor",
-                                "Stationary mine; opponents trigger it on pickup after 2 seconds. Right-click nearby armed TNT to launch from its blast.", maxTnt);
+                                "Step onto your armed mine from the side you want to launch toward. Opponents still trigger it when they step on it.", maxTnt);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextTntAt.put(id, now + interval);
@@ -18351,21 +18304,38 @@ public final class ArcadePortManager implements Listener {
         // Cancel every pickup attempt so TNT never enters an inventory.
         event.setCancelled(true);
         if (!session.alive.contains(target.getUniqueId())) return;
-        if (!ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
-                mine.getTicksLived(), target.getLocation().distance(mine.getLocation()),
-                target.getUniqueId().equals(ownerId))) return;
+        boolean ownerSteppedOnMine = target.getUniqueId().equals(ownerId);
+        double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
+        boolean shouldTrigger = ownerSteppedOnMine
+                ? DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
+                        true, mine.getTicksLived(), target.getLocation().distance(mine.getLocation()),
+                        GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS",
+                                ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS), triggerRadius)
+                : ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
+                        mine.getTicksLived(), target.getLocation().distance(mine.getLocation()), false);
+        if (!shouldTrigger) return;
 
         session.dragonEscapeMineOwners.remove(mine.getUniqueId());
         session.entities.remove(mine);
         mine.remove();
-        target.setVelocity(new Vector(0.0D, GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y), 0.0D));
+        if (ownerSteppedOnMine) {
+            Vector mineCenter = mine.getLocation().toVector().add(new Vector(0.0D, 0.25D, 0.0D));
+            Vector playerCenter = target.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
+            target.setVelocity(DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                    target.getVelocity(), playerCenter, mineCenter, triggerRadius));
+            target.sendActionBar(ChatColor.GREEN + "Disruptor boosted!");
+        } else {
+            target.setVelocity(new Vector(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                    "DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y), 0.0D));
+            target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
+        }
         target.setFallDistance(0.0F);
         session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
         session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
         target.playEffect(EntityEffect.HURT);
         target.setSprinting(false);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 2.0F);
-        target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
     }
 
     private boolean isDragonEscapeDiggerBlockAllowed(Material material) {
@@ -31669,10 +31639,6 @@ public final class ArcadePortManager implements Listener {
             }
             if (event.getAction().isRightClick() && item == Material.TNT && "disruptor".equals(kit)) {
                 if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
-                    event.setCancelled(true);
-                    return;
-                }
-                if (useDragonEscapeDisruptorSelfBoost(session, player)) {
                     event.setCancelled(true);
                     return;
                 }
