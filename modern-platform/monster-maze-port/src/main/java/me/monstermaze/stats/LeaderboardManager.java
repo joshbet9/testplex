@@ -16,9 +16,9 @@ import java.util.regex.Pattern;
 /**
  * Leaderboards and personal bests.
  *
- * The hosted/public server uses the backend as its source of truth. YAML is
- * retained only for standalone/offline implementations and during the short
- * period before the first successful backend refresh.
+ * The hosted/public server uses the backend for global records. YAML also
+ * retains local per-pattern kit PBs so all-maze kit boards remain available
+ * while the backend refreshes or is temporarily unavailable.
  */
 public class LeaderboardManager {
     public static final int PATTERN_COUNT = 3;
@@ -34,8 +34,7 @@ public class LeaderboardManager {
     private volatile Map<String, Map<String, List<OverallEntry>>> remoteKit = new HashMap<String, Map<String, List<OverallEntry>>>();
     private volatile Map<String, Map<Integer, Map<String, PBInfo>>> remotePB = new HashMap<String, Map<Integer, Map<String, PBInfo>>>();
 
-    private static final Pattern JSON_ROW = Pattern.compile(
-            "\\{\\\"name\\\":\\\"((?:\\\\.|[^\\\"\\\\])*)\\\",\\\"kit\\\":\\\"((?:\\\\.|[^\\\"\\\\])*)\\\",\\\"stage\\\":(\\d+)\\}");
+    private static final Pattern JSON_OBJECT = Pattern.compile("\\{([^{}]*)\\}");
     private static final Pattern JSON_PB = Pattern.compile(
             "\\{\\\"pattern\\\":(\\d+),\\\"kit\\\":\\\"((?:\\\\.|[^\\\"\\\\])*)\\\",\\\"stage\\\":(\\d+),\\\"timeMs\\\":(\\d+)\\}");
 
@@ -81,7 +80,9 @@ public class LeaderboardManager {
 
     private static String modeKey(MazeMode mode) { return mode.id.toLowerCase(); }
     private static String patternKey(int pattern) { return "pattern" + pattern; }
-    public static String patternName(int pattern) { return "Maze " + (pattern + 1); }
+    public static String patternName(int pattern) {
+        return pattern >= 0 && pattern < PATTERN_COUNT ? "Maze " + (pattern + 1) : "All Mazes";
+    }
 
     /** Capture Bukkit state on the main thread, then do all HTTP work asynchronously. */
     public void refreshFromBackend() {
@@ -106,17 +107,19 @@ public class LeaderboardManager {
 
             for (MazeMode mode : MazeMode.values()) {
                 String mk = modeKey(mode);
-                overall.put(mk, parseBoard(backend.get("/api/v1/leaderboard/1.21/" + mk + "/overall")));
+                overall.put(mk, parseBoard(backend.get("/api/v1/leaderboard/1.21/" + mk + "/overall"), -1));
 
                 Map<Integer, List<OverallEntry>> modePatterns = new HashMap<Integer, List<OverallEntry>>();
                 for (int pattern = 0; pattern < PATTERN_COUNT; pattern++) {
-                    modePatterns.put(pattern, parseBoard(backend.get("/api/v1/leaderboard/1.21/" + mk + "/pattern/" + pattern)));
+                    modePatterns.put(pattern, parseBoard(
+                            backend.get("/api/v1/leaderboard/1.21/" + mk + "/pattern/" + pattern), pattern));
                 }
                 patterns.put(mk, modePatterns);
 
                 Map<String, List<OverallEntry>> modeKits = new HashMap<String, List<OverallEntry>>();
                 for (KitType kit : KitType.values()) {
-                    modeKits.put(kit.id, parseBoard(backend.get("/api/v1/leaderboard/1.21/" + mk + "/kit/" + kit.id)));
+                    modeKits.put(kit.id, aggregateKitRows(parseBoard(
+                            backend.get("/api/v1/leaderboard/1.21/" + mk + "/kit/" + kit.id), -1)));
                 }
                 kits.put(mk, modeKits);
 
@@ -137,12 +140,58 @@ public class LeaderboardManager {
         }
     }
 
-    private static List<OverallEntry> parseBoard(String json) {
+    /** Parse leaderboard rows without depending on JSON field order or an exact field set. */
+    static List<OverallEntry> parseBoard(String json, int defaultPattern) {
         List<OverallEntry> out = new ArrayList<OverallEntry>();
         if (json == null) return out;
-        Matcher m = JSON_ROW.matcher(json);
-        while (m.find()) out.add(new OverallEntry(unescape(m.group(1)), Integer.parseInt(m.group(3)), unescape(m.group(2)), -1));
+        Matcher objects = JSON_OBJECT.matcher(json);
+        while (objects.find()) {
+            String object = objects.group(1);
+            String name = jsonStringField(object, "name");
+            String kit = jsonStringField(object, "kit");
+            Integer stage = jsonIntegerField(object, "stage");
+            if (name == null || kit == null || stage == null || stage < 1) continue;
+            Integer pattern = jsonIntegerField(object, "pattern");
+            out.add(new OverallEntry(name, stage, kit, pattern == null ? defaultPattern : pattern));
+        }
         return out;
+    }
+
+    /** A kit board represents each player's best result across every maze, once. */
+    static List<OverallEntry> aggregateKitRows(List<OverallEntry> rows) {
+        Map<String, OverallEntry> bestByPlayer = new HashMap<String, OverallEntry>();
+        if (rows != null) for (OverallEntry row : rows) {
+            if (row == null || row.name == null || row.name.trim().isEmpty() || row.stage < 1) continue;
+            String key = row.name.trim().toLowerCase(Locale.ROOT);
+            OverallEntry previous = bestByPlayer.get(key);
+            if (previous == null || row.stage > previous.stage
+                    || (row.stage == previous.stage && row.pattern >= 0
+                    && (previous.pattern < 0 || row.pattern < previous.pattern))) {
+                bestByPlayer.put(key, row);
+            }
+        }
+        List<OverallEntry> ranked = new ArrayList<OverallEntry>(bestByPlayer.values());
+        Collections.sort(ranked, new Comparator<OverallEntry>() {
+            @Override public int compare(OverallEntry a, OverallEntry b) {
+                int stageOrder = Integer.compare(b.stage, a.stage);
+                return stageOrder != 0 ? stageOrder : a.name.compareToIgnoreCase(b.name);
+            }
+        });
+        return ranked;
+    }
+
+    private static String jsonStringField(String object, String key) {
+        Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(key)
+                + "\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"").matcher(object);
+        return matcher.find() ? unescape(matcher.group(1)) : null;
+    }
+
+    private static Integer jsonIntegerField(String object, String key) {
+        Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(key)
+                + "\\\"\\s*:\\s*(-?\\d+)").matcher(object);
+        if (!matcher.find()) return null;
+        try { return Integer.valueOf(matcher.group(1)); }
+        catch (NumberFormatException ignored) { return null; }
     }
 
     private static Map<Integer, Map<String, PBInfo>> parsePB(String json) {
@@ -174,16 +223,43 @@ public class LeaderboardManager {
         if (kitId == null) return 0;
         if (remoteReady) {
             Map<Integer, Map<String, PBInfo>> byPattern = remotePlayer(mode, player);
-            if (byPattern == null) return 0;
-            Map<String, PBInfo> kits = byPattern.get(pattern);
-            if (kits == null) return 0;
-            PBInfo info = kits.get(kitId);
-            if (info != null) return info.stage;
-            for (Map.Entry<String, PBInfo> e : kits.entrySet()) if (e.getKey().equalsIgnoreCase(kitId)) return e.getValue().stage;
-            return 0;
+            Map<String, PBInfo> kits = byPattern == null ? null : byPattern.get(pattern);
+            PBInfo info = kits == null ? null : kits.get(kitId);
+            int remoteStage = info == null ? 0 : info.stage;
+            if (info == null && kits != null) for (Map.Entry<String, PBInfo> e : kits.entrySet()) {
+                if (e.getKey().equalsIgnoreCase(kitId)) {
+                    remoteStage = e.getValue().stage;
+                    break;
+                }
+            }
+            return Math.max(remoteStage, localKitPB(mode, pattern, player, kitId));
         }
-        ConfigurationSection ps = playerSection(mode, pattern, player);
-        return ps == null ? 0 : ps.getInt(kitId, 0);
+        return localKitPB(mode, pattern, player, kitId);
+    }
+
+    private int localKitPB(MazeMode mode, int pattern, UUID player, String kitId) {
+        return storedKitPB(data, mode, pattern, player, kitId);
+    }
+
+    static int storedKitPB(YamlConfiguration records, MazeMode mode, int pattern, UUID player, String kitId) {
+        ConfigurationSection modeSection = records.getConfigurationSection(modeKey(mode));
+        ConfigurationSection patternSection = modeSection == null ? null
+                : modeSection.getConfigurationSection(patternKey(pattern));
+        ConfigurationSection ps = patternSection == null ? null
+                : patternSection.getConfigurationSection(player.toString());
+        if (ps == null) return 0;
+        if (ps.contains(kitId)) return ps.getInt(kitId, 0);
+        for (String storedKit : ps.getKeys(false)) if (storedKit.equalsIgnoreCase(kitId)) return ps.getInt(storedKit, 0);
+        return 0;
+    }
+
+    static boolean storeKitPB(YamlConfiguration records, MazeMode mode, int pattern,
+                              UUID player, String kitId, int stage) {
+        if (records == null || mode == null || pattern < 0 || pattern >= PATTERN_COUNT
+                || player == null || kitId == null || kitId.isEmpty() || stage < 1
+                || stage <= storedKitPB(records, mode, pattern, player, kitId)) return false;
+        records.set(modeKey(mode) + "." + patternKey(pattern) + "." + player + "." + kitId, stage);
+        return true;
     }
 
     public int getPB(MazeMode mode, int pattern, UUID player) {
@@ -194,11 +270,16 @@ public class LeaderboardManager {
     public PBInfo getBest(MazeMode mode, int pattern, UUID player) {
         if (remoteReady) {
             Map<Integer, Map<String, PBInfo>> byPattern = remotePlayer(mode, player);
-            if (byPattern == null) return null;
-            Map<String, PBInfo> kits = byPattern.get(pattern);
-            if (kits == null) return null;
             PBInfo best = null;
-            for (PBInfo info : kits.values()) if (best == null || info.stage > best.stage) best = info;
+            Map<String, PBInfo> kits = byPattern == null ? null : byPattern.get(pattern);
+            if (kits != null) for (PBInfo info : kits.values()) {
+                if (best == null || info.stage > best.stage) best = info;
+            }
+            ConfigurationSection local = playerSection(mode, pattern, player);
+            if (local != null) for (String kit : local.getKeys(false)) {
+                int stage = local.getInt(kit, 0);
+                if (stage > 0 && (best == null || stage > best.stage)) best = new PBInfo(stage, kit);
+            }
             return best;
         }
         ConfigurationSection ps = playerSection(mode, pattern, player);
@@ -212,11 +293,12 @@ public class LeaderboardManager {
     }
 
     public void recordRun(MazeMode mode, int pattern, UUID player, int stage, String kitId) {
-        if (backend != null && backend.isEnabled()) return;
-        if (player == null || pattern < 0 || pattern >= PATTERN_COUNT || stage < 1 || kitId == null || kitId.isEmpty()) return;
-        if (stage <= getKitPB(mode, pattern, player, kitId)) return;
-        data.set(modeKey(mode) + "." + patternKey(pattern) + "." + player.toString() + "." + kitId, stage);
-        save();
+        if (mode == null || player == null || pattern < 0 || pattern >= PATTERN_COUNT
+                || stage < 1 || kitId == null || kitId.isEmpty()) return;
+        // Keep a local durable PB cache even when the backend is active. It lets
+        // kit boards retain a just-finished run while the remote leaderboard
+        // catches up and preserves it if a remote refresh is temporarily stale.
+        if (storeKitPB(data, mode, pattern, player, kitId, stage)) save();
     }
 
     public void recordRun(MazeMode mode, int pattern, UUID player, int stage, KitType kit) {
@@ -265,7 +347,8 @@ public class LeaderboardManager {
     public List<OverallEntry> getModeLeaderboard(MazeMode mode, int limit) {
         if (remoteReady) {
             List<OverallEntry> rows = remoteOverall.get(modeKey(mode));
-            return rows == null ? new ArrayList<OverallEntry>() : new ArrayList<OverallEntry>(rows.subList(0, Math.min(limit, rows.size())));
+            return rows == null ? new ArrayList<OverallEntry>()
+                    : new ArrayList<OverallEntry>(rows.subList(0, Math.min(limit, rows.size())));
         }
         return localModeLeaderboard(mode, limit, null);
     }
@@ -276,7 +359,11 @@ public class LeaderboardManager {
             Map<String, List<OverallEntry>> modeKits = remoteKit.get(modeKey(mode));
             List<OverallEntry> rows = modeKits == null ? null : modeKits.get(kit.id);
             if (rows == null && modeKits != null) for (Map.Entry<String, List<OverallEntry>> e : modeKits.entrySet()) if (e.getKey().equalsIgnoreCase(kit.id)) { rows = e.getValue(); break; }
-            return rows == null ? new ArrayList<OverallEntry>() : new ArrayList<OverallEntry>(rows.subList(0, Math.min(limit, rows.size())));
+            List<OverallEntry> combined = aggregateKitRows(rows);
+            combined.addAll(localModeLeaderboard(mode, Integer.MAX_VALUE, kit));
+            combined = aggregateKitRows(combined);
+            return combined.size() > limit
+                    ? new ArrayList<OverallEntry>(combined.subList(0, limit)) : combined;
         }
         return localModeLeaderboard(mode, limit, kit);
     }
