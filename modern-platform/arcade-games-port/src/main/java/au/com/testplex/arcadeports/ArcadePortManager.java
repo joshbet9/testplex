@@ -28550,6 +28550,27 @@ public final class ArcadePortManager implements Listener {
         sneakyAssassins.handleCombust(event);
     }
 
+    private void recordDragonEscapeDisruptorSupport(Session session, Player player, PlayerMoveEvent event) {
+        if (event instanceof PlayerTeleportEvent) return;
+        Location to = event.getTo();
+        if (to == null || to.getWorld() != session.world) return;
+
+        Block feet = to.getBlock();
+        Block support = feet.getRelative(BlockFace.DOWN);
+        double clearance = to.getY() - support.getY() - 1.0D;
+        if (!support.getType().isSolid() || !Double.isFinite(clearance)
+                || clearance < -0.05D || clearance > 0.18D) return;
+
+        long now = System.currentTimeMillis();
+        LinkedHashMap<Block, Long> history = session.dragonEscapeDisruptorSupportHistory
+                .computeIfAbsent(player.getUniqueId(), ignored -> new LinkedHashMap<>());
+        history.entrySet().removeIf(entry -> now - entry.getValue() > 1_000L);
+        history.put(support, now);
+        while (history.size() > 64) {
+            history.remove(history.keySet().iterator().next());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Session session = active;
@@ -28573,6 +28594,11 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             return;
+        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && "disruptor".equals(session.dragonEscapeKits.getOrDefault(playerId, "jumper"))
+                && session.alive.contains(playerId)) {
+            recordDragonEscapeDisruptorSupport(session, player, event);
         }
         // Once Acrobat is latched to a wall, block *all* positional movement
         // (forward, backward, strafe, sneaking) while preserving head rotation.
@@ -32172,11 +32198,20 @@ public final class ArcadePortManager implements Listener {
                 Location feet = player.getLocation();
                 double feetClearance = clicked == null ? Double.NaN
                         : player.getBoundingBox().getMinY() - clicked.getBoundingBox().getMaxY();
+                                long now = System.currentTimeMillis();
+                boolean currentSupport = clicked != null && clicked.getWorld() == player.getWorld()
+                        && clicked.getX() == feet.getBlockX() && clicked.getZ() == feet.getBlockZ()
+                        && feetClearance >= -0.05D && feetClearance <= 0.18D;
+                LinkedHashMap<Block, Long> supportHistory =
+                        session.dragonEscapeDisruptorSupportHistory.get(player.getUniqueId());
+                Long supportSeenAt = supportHistory == null || clicked == null ? null : supportHistory.get(clicked);
+                boolean recentlySupported = supportSeenAt != null
+                        && DragonEscapeMovementKits.isRecentDisruptorSupport(
+                                supportSeenAt, now, player.getPing());
                 boolean underfootUse = DragonEscapeMovementKits.shouldSelfLaunchDisruptorFromUnderfoot(
                         event.getAction().isRightClick(), event.getBlockFace() == BlockFace.UP,
-                        clicked != null && clicked.getWorld() == player.getWorld()
-                                && clicked.getX() == feet.getBlockX() && clicked.getZ() == feet.getBlockZ(),
-                        feetClearance);
+                        currentSupport || recentlySupported,
+                        recentlySupported ? 0.0D : feetClearance);
                 if (underfootUse) {
                     consumeHeld(player);
                     player.setVelocity(DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(
@@ -37614,6 +37649,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Location> dragonEscapePracticeCheckpoints = new HashMap<>();
         final Map<UUID, DragonEscapeMovementKits.FlutterState> dragonEscapeFlutterStates = new HashMap<>();
         final Map<UUID, DragonEscapeMovementKits.AcrobatState> dragonEscapeAcrobatStates = new HashMap<>();
+        final Map<UUID, LinkedHashMap<Block, Long>> dragonEscapeDisruptorSupportHistory = new HashMap<>();
         final Map<Block, BlockData> dragonEscapePracticeChangedBlocks = new HashMap<>();
         final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
         final Map<UUID, Set<MasterBuilderBlockKey>> masterBuilderPlacedBlocks = new HashMap<>();

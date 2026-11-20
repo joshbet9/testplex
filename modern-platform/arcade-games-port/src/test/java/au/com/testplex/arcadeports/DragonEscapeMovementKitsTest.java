@@ -176,6 +176,24 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void disruptorRecentSupportWindowHandlesLatencyAndStaleEvents() {
+        assertEquals(500L, DragonEscapeMovementKits.disruptorSupportHistoryMillis(200));
+        assertTrue(DragonEscapeMovementKits.isRecentDisruptorSupport(10_000L, 10_450L, 200));
+        assertFalse(DragonEscapeMovementKits.isRecentDisruptorSupport(10_000L, 10_501L, 200));
+        assertFalse(DragonEscapeMovementKits.isRecentDisruptorSupport(10_500L, 10_400L, 200));
+        assertEquals(1_000L, DragonEscapeMovementKits.disruptorSupportHistoryMillis(900));
+    }
+
+    @Test
+    void disruptorSelfLaunchImpulseIsHalvedAndRetainsRunningMomentum() {
+        Vector current = new Vector(0.4D, 0.0D, 0.2D);
+        Vector launched = DragonEscapeMovementKits.disruptorUnderfootLaunchVelocity(current);
+        assertEquals(0.825D, launched.getY(), 0.00001D);
+        assertEquals(0.4D, launched.getX(), 0.00001D);
+        assertEquals(0.2D, launched.getZ(), 0.00001D);
+    }
+
+    @Test
     void dragonEscapeVisibilityAndGhostControlsUseSeparateHotbarSlots() {
         assertEquals(4, DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT);
         assertEquals(8, DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT);

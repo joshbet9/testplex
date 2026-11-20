@@ -222,7 +222,7 @@ final class DragonEscapeMovementKits {
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 
-    static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
+    static final double DISRUPTOR_MINE_BLAST_IMPULSE = 0.825D;
 
     /** Only the Disruptor's TNT ability item needs Adventure-mode block permission. */
     static boolean shouldEnableDisruptorAdventurePlacement(org.bukkit.Material material, String displayName) {
@@ -234,6 +234,16 @@ final class DragonEscapeMovementKits {
             boolean rightClickBlock, boolean topFace, boolean clickedSupportBlock, double feetClearance) {
         return rightClickBlock && topFace && clickedSupportBlock
                 && Double.isFinite(feetClearance) && feetClearance >= -0.05D && feetClearance <= 0.18D;
+    }
+
+    /** Converts RTT into a bounded window for matching a delayed use to a recent support block. */
+    static long disruptorSupportHistoryMillis(int pingMillis) {
+        return Math.max(250L, Math.min(1_000L, Math.max(0, pingMillis) * 2L + 100L));
+    }
+
+    static boolean isRecentDisruptorSupport(long supportSeenAtMillis, long nowMillis, int pingMillis) {
+        long age = nowMillis - supportSeenAtMillis;
+        return age >= 0L && age <= disruptorSupportHistoryMillis(pingMillis);
     }
 
     /** Adds an immediate vertical TNT impulse, independent of item pickup timing. */
