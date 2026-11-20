@@ -169,7 +169,7 @@ jobs:
             test -d /tmp/testplex-ci-server/mm_void
             test ! -L /tmp/testplex-ci-server/mm_void
             mkdir -p /tmp/testplex-ci-runtime/mm_void
-            rm -f /tmp/testplex-ci-server/mm_void
+            rm -rf /tmp/testplex-ci-server/mm_void
             ln -s /tmp/testplex-ci-runtime/mm_void /tmp/testplex-ci-server/mm_void
             TESTPLEX_MM_RUNTIME_ROOT=/tmp/testplex-ci-runtime /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-server
             test -d /tmp/testplex-ci-server/mm_void
