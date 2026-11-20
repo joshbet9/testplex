@@ -150,15 +150,17 @@ class DragonsDebugRulesTest {
     }
 
     @Test
-    void dragonsFollowSourceSkyWaypointThenChargeLivingRacers() {
-        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(70.0D, 70.0D, 1));
-        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(69.9D, 70.0D, 3));
-        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(80.0D, 70.0D, 0));
-        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(Double.NaN, 70.0D, 1));
-        assertTrue(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(70.1D, 70.0D, 1));
-        assertTrue(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(80.0D, 70.0D, 3));
-        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+    void autonomousDragonsUseNativeChargePhaseForRacerAndSparklerTargets() {
+        assertEquals(EnderDragon.Phase.CHARGE_PLAYER, ArcadePortRules.dragonsAutonomousPhase(true));
         assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
+    }
+
+    @Test
+    void dragonCollisionCancellationIsLimitedToTrackedDragonsInTheDragonsGame() {
+        assertTrue(ArcadePortRules.shouldCancelDragonsEntityCollision(true, true, true));
+        assertFalse(ArcadePortRules.shouldCancelDragonsEntityCollision(false, true, true));
+        assertFalse(ArcadePortRules.shouldCancelDragonsEntityCollision(true, true, false));
+        assertFalse(ArcadePortRules.shouldCancelDragonsEntityCollision(true, false, true));
     }
 
     @Test
