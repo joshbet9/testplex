@@ -1754,6 +1754,29 @@ public final class ArcadePortRules {
         return flight;
     }
 
+    /**
+     * Gently turn a waypoint-bound dragon toward the source target block. A
+     * blended heading prevents abrupt 90-degree course changes between updates.
+     */
+    public static Vector dragonsWaypointHeading(Vector offset, Vector previousHeading) {
+        if (offset == null || !Double.isFinite(offset.getX()) || !Double.isFinite(offset.getY())
+                || !Double.isFinite(offset.getZ()) || offset.lengthSquared() < 1.0E-6D) {
+            if (previousHeading == null || previousHeading.lengthSquared() < 1.0E-6D) {
+                return new Vector(0.0D, 0.0D, 1.0D);
+            }
+            return previousHeading.clone().normalize();
+        }
+        Vector desired = offset.clone().normalize();
+        if (previousHeading == null || !Double.isFinite(previousHeading.getX())
+                || !Double.isFinite(previousHeading.getY()) || !Double.isFinite(previousHeading.getZ())
+                || previousHeading.lengthSquared() < 1.0E-6D) {
+            return desired;
+        }
+        Vector blended = previousHeading.clone().normalize().multiply(0.65D)
+                .add(desired.multiply(0.35D));
+        return blended.lengthSquared() < 1.0E-6D ? offset.clone().normalize() : blended.normalize();
+    }
+
     public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
         return y >= GameDebugRuntimeOverrides.doubleValue(
                 "DRAGONS_SPARKLER_MIN_ATTRACT_Y", DRAGONS_SPARKLER_MIN_ATTRACT_Y) && !inLiquid;
