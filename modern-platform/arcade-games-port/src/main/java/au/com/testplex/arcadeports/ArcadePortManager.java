@@ -6804,7 +6804,8 @@ public final class ArcadePortManager implements Listener {
     private void openGladiatorVoteMenu(Player player) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
+                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
+                || session.gladiatorVotes.containsKey(player.getUniqueId())) return;
         openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote",
                 session.gladiatorVoteOptions);
     }
@@ -7271,8 +7272,8 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.getInventory().clear();
             player.setGameMode(GameMode.ADVENTURE);
-            giveGladiatorVoteItem(player);
             if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
+                giveGladiatorVoteItem(player);
                 player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
             }
             // Opening immediately after closeInventory can be lost by the client/server
@@ -7379,6 +7380,15 @@ public final class ArcadePortManager implements Listener {
                 || !session.players.containsKey(player.getUniqueId())
                 || !session.gladiatorVoteOptions.contains(mode)) return;
         session.gladiatorVotes.put(player.getUniqueId(), mode.id());
+        // The ballot is final for this player: retire its book and stop forcing the GUI.
+        player.getInventory().setItem(8, null);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline() && active == session
+                    && player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
+                    && holder.type == GladiatorMenuType.VOTE && !holder.lobbyVote) {
+                player.closeInventory();
+            }
+        });
         player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
         long onlineVoters = session.players.values().stream()
                 .filter(candidate -> candidate != null && candidate.isOnline()).count();
@@ -34573,11 +34583,13 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         long now = System.currentTimeMillis();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || session.gladiatorVotes.containsKey(player.getUniqueId())
                 || !ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
                         session.players.containsKey(player.getUniqueId()), session.gladiatorVotingEndsAt, now)) return;
         Bukkit.getScheduler().runTask(plugin, () -> {
             Session current = active;
             if (player.isOnline() && current == session
+                    && !current.gladiatorVotes.containsKey(player.getUniqueId())
                     && ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
                             current.players.containsKey(player.getUniqueId()),
                             current.gladiatorVotingEndsAt, System.currentTimeMillis())) {
