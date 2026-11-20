@@ -385,8 +385,11 @@ class SessionState {
     final Map<UUID, Integer> deathTagTurtleStacksByChaser = new HashMap<>();
     final Map<UUID, Long> deathTagTurtleLastHitAt = new HashMap<>();
     final Map<UUID, Integer> deathTagTurtleWindCharges = new HashMap<>();
-    final Set<UUID> deathTagTricksterSwapUsed = new HashSet<>();
+    final Map<UUID, Long> deathTagTurtleGuardUntil = new HashMap<>();
+    final Map<UUID, Long> deathTagTurtleGuardReadyAt = new HashMap<>();
+    final Map<UUID, Long> deathTagTricksterSwapReadyAt = new HashMap<>();
     final Map<UUID, Long> deathTagTricksterFireworksReadyAt = new HashMap<>();
+    final DeathTagTricksterMechanics deathTagTricksterMechanics = new DeathTagTricksterMechanics();
     final Map<UUID, String> deathTagRunnerTrailColours = new HashMap<>();
     final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
     final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
