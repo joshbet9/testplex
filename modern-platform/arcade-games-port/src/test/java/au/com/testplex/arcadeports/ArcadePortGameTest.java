@@ -461,17 +461,18 @@ class ArcadePortGameTest {
         assertEquals("Power-up obtained", ArcadePortRules.bombLobbersPowerupObtainedLabel());
     }
 
-    @Test void bombLobbersPowerupUsesPairedOneMinuteAverageWaveAndTwoActiveDrops() {
+    @Test void bombLobbersPowerupWavesAreRandomAndPairedForBothTeams() {
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
-        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(2));
-        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(6));
-        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(10));
-        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(16));
+        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(0L));
+        assertEquals(100_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(80_000L));
+        assertTrue(ArcadePortRules.canSpawnPairedBombLobbersPowerupWave(true, true));
+        assertFalse(ArcadePortRules.canSpawnPairedBombLobbersPowerupWave(true, false));
+        assertFalse(ArcadePortRules.canSpawnPairedBombLobbersPowerupWave(false, true));
     }
 
     @Test void bombLobbersSuperAndFieryTntHaveDistinctBlastEffects() {

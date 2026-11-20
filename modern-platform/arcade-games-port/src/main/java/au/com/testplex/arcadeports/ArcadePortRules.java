@@ -2095,9 +2095,9 @@ public final class ArcadePortRules {
         return 60_000L;
     }
 
-    /** Each wave retains at most one uncollected power-up per team, regardless of lobby size. */
-    public static int bombLobbersPowerupMaxActive(int lobbyPlayers) {
-        return 2;
+    /** Paired waves spawn only when both teams have a safe location, preserving equal availability. */
+    public static boolean canSpawnPairedBombLobbersPowerupWave(boolean redSpawnAvailable, boolean blueSpawnAvailable) {
+        return redSpawnAvailable && blueSpawnAvailable;
     }
 
     public static long bombLobbersPowerupSpawnDelayMillis(long randomValue) {
