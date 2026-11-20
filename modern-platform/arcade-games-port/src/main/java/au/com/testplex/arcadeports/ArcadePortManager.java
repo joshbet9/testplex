@@ -32235,6 +32235,13 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (!session.alive.contains(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.DEATH_TAG && event.getAction().isRightClick()
+                && item == Material.WIND_CHARGE && "turtle".equals(
+                        session.deathTagRunnerKits.get(player.getUniqueId()))) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (active == session && player.isOnline()) updateDeathTagTurtleWindChargeBar(session, player);
+            });
+        }
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getAction().isRightClick() && item == Material.BOW
                 && "shredder".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
