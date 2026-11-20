@@ -28557,9 +28557,9 @@ public final class ArcadePortManager implements Listener {
 
         Block feet = to.getBlock();
         Block support = feet.getRelative(BlockFace.DOWN);
-        double clearance = to.getY() - support.getY() - 1.0D;
-        if (!support.getType().isSolid() || !Double.isFinite(clearance)
-                || clearance < -0.05D || clearance > 0.18D) return;
+        double clearance = to.getY() - support.getBoundingBox().getMaxY();
+        if (!DragonEscapeMovementKits.hasDisruptorSupportClearance(
+                support.getType().isSolid(), clearance)) return;
 
         long now = System.currentTimeMillis();
         LinkedHashMap<Block, Long> history = session.dragonEscapeDisruptorSupportHistory

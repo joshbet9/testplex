@@ -236,6 +236,10 @@ final class DragonEscapeMovementKits {
                 && Double.isFinite(feetClearance) && feetClearance >= -0.05D && feetClearance <= 0.18D;
     }
 
+    static boolean hasDisruptorSupportClearance(boolean solidSupport, double clearance) {
+        return solidSupport && Double.isFinite(clearance) && clearance >= -0.05D && clearance <= 0.18D;
+    }
+
     /** Converts RTT into a bounded window for matching a delayed use to a recent support block. */
     static long disruptorSupportHistoryMillis(int pingMillis) {
         return Math.max(250L, Math.min(1_000L, Math.max(0, pingMillis) * 2L + 100L));
