@@ -645,6 +645,14 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS = 100_000L;
     public static final long BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS = 10_000L;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
+    public static final int BOMB_LOBBERS_POWERUP_EFFECT_DURATION_TICKS = 160;
+    public static final int BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_DURATION_TICKS = 160;
+    public static final int BOMB_LOBBERS_POWERUP_DIRECT_HIT_PROTECTION_TICKS = 160;
+    public static final double BOMB_LOBBERS_POWERUP_DIRECT_HIT_REDUCTION = 0.5D;
+    public static final double BOMB_LOBBERS_POWERUP_TNT_DAMAGE_MULTIPLIER = 1.5D;
+    public static final double BOMB_LOBBERS_POWERUP_THROW_VELOCITY_MULTIPLIER = 1.4D;
+    public static final double BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_MULTIPLIER = 1.35D;
+    public static final long BOMB_LOBBERS_POWERUP_AURA_INTERVAL_MILLIS = 500L;
 
     /** Short source-style action-bar notice used when a power-up is collected. */
     public static String bombLobbersPowerupObtainedLabel() {
@@ -2072,6 +2080,22 @@ public final class ArcadePortRules {
                 "BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS));
     }
 
+    public static int bombLobbersPowerupEffectDurationTicks() {
+        return BOMB_LOBBERS_POWERUP_EFFECT_DURATION_TICKS;
+    }
+
+    public static int bombLobbersPowerupDoubleJumpDurationTicks() {
+        return BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_DURATION_TICKS;
+    }
+
+    public static int bombLobbersPowerupDirectHitProtectionTicks() {
+        return BOMB_LOBBERS_POWERUP_DIRECT_HIT_PROTECTION_TICKS;
+    }
+
+    public static long bombLobbersPowerupAuraIntervalMillis() {
+        return BOMB_LOBBERS_POWERUP_AURA_INTERVAL_MILLIS;
+    }
+
     /** True for the metal armour supplied by the Armorer kit.
      * Jumper/Waller instead inherit the separate team-coloured leather armour module.
      */
@@ -2133,6 +2157,34 @@ public final class ArcadePortRules {
 
     public static boolean bombLobbersTntIgnites(String powerupType) {
         return "fiery-tnt".equalsIgnoreCase(powerupType);
+    }
+
+    public static double bombLobbersPowerupTntDamageMultiplier(String powerupType) {
+        return "tnt-multiplier".equalsIgnoreCase(powerupType)
+                ? BOMB_LOBBERS_POWERUP_TNT_DAMAGE_MULTIPLIER : 1.0D;
+    }
+
+    public static double bombLobbersPowerupThrowVelocityMultiplier(String powerupType) {
+        return "throw-strength".equalsIgnoreCase(powerupType)
+                ? BOMB_LOBBERS_POWERUP_THROW_VELOCITY_MULTIPLIER : 1.0D;
+    }
+
+    public static double bombLobbersPowerupDoubleJumpMultiplier(boolean boostActive) {
+        return boostActive ? BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_MULTIPLIER : 1.0D;
+    }
+
+    public static double bombLobbersDirectHitDamageAfterProtection(double damage, boolean protectionActive) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
+        return protectionActive ? damage * BOMB_LOBBERS_POWERUP_DIRECT_HIT_REDUCTION : damage;
+    }
+
+    public static boolean bombLobbersTimedPowerupActive(long nowMillis, long expiresAtMillis) {
+        return expiresAtMillis > nowMillis;
+    }
+
+    public static boolean shouldIgniteBombLobbersBlock(boolean fireCellIsAir, boolean groundIsSolid,
+            boolean fireCellIsLiquid, boolean groundIsLiquid) {
+        return fireCellIsAir && groundIsSolid && !fireCellIsLiquid && !groundIsLiquid;
     }
     /** Correct Minecraft material for the colour shown through a Dragon Escape finish beacon. */
     public static Material dragonEscapeBeaconGlassMaterial(String colour) {
@@ -2199,8 +2251,13 @@ public final class ArcadePortRules {
         return switch (type.toLowerCase(java.util.Locale.ROOT)) {
             case "wind-charge" -> ChatColor.AQUA;
             case "super-tnt" -> ChatColor.DARK_RED;
+            case "tnt-multiplier" -> ChatColor.RED;
+            case "throw-strength" -> ChatColor.GOLD;
             case "fiery-tnt" -> ChatColor.GOLD;
             case "speed-boost" -> ChatColor.GREEN;
+            case "jump-boost", "double-jump-boost" -> ChatColor.LIGHT_PURPLE;
+            case "regeneration" -> ChatColor.RED;
+            case "direct-hit-protection" -> ChatColor.YELLOW;
             default -> ChatColor.GRAY;
         };
     }
@@ -2210,8 +2267,14 @@ public final class ArcadePortRules {
         return switch (type.toLowerCase(java.util.Locale.ROOT)) {
             case "wind-charge" -> "Wind Charge";
             case "super-tnt" -> "Super Explosive TNT";
+            case "tnt-multiplier" -> "TNT Multiplier";
+            case "throw-strength" -> "TNT Throw Strength";
             case "fiery-tnt" -> "Fiery TNT";
             case "speed-boost" -> "Speed Boost";
+            case "jump-boost" -> "Jump Boost";
+            case "double-jump-boost" -> "Double Jump Boost";
+            case "regeneration" -> "Regeneration";
+            case "direct-hit-protection" -> "Direct-Hit Protection";
             default -> "Power-up";
         };
     }

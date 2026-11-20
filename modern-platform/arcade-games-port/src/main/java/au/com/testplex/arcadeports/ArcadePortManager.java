@@ -24097,6 +24097,14 @@ public final class ArcadePortManager implements Listener {
         session.bombConstructorBlockedBombs.clear();
         session.bombConstructorBlockedCounts.clear();
         session.bombPowerTypes.clear();
+        session.bombDirectHitProtectionUntil.clear();
+        session.bombDoubleJumpBoostUntil.clear();
+        for (Block fire : session.bombTemporaryFireBlocks) {
+            if (fire != null && fire.getWorld() == session.world && fire.getType() == Material.FIRE) {
+                fire.setType(Material.AIR, false);
+            }
+        }
+        session.bombTemporaryFireBlocks.clear();
         session.bombPowerupDrops.clear();
         session.bombPowerupTeamByDrop.clear();
         session.bombLastThrowAt.clear();
@@ -31418,8 +31426,7 @@ public final class ArcadePortManager implements Listener {
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
                     && heldItem != null
                     && (isBombLobbersThrownTnt(heldItem)
-                        || "wind-charge".equals(bombLobbersPowerupType(heldItem))
-                        || "speed-boost".equals(bombLobbersPowerupType(heldItem))
+                        || isBombLobbersActivatablePowerup(heldItem)
                         || ("constructor".equals(bombKit) && heldItem.getType() == Material.BRICKS))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
@@ -31612,6 +31619,14 @@ public final class ArcadePortManager implements Listener {
                 && "speed-boost".equals(bombLobbersPowerupType(heldItem))) {
             event.setCancelled(true);
             useBombLobbersSpeedBoost(session, player, heldItem);
+            return;
+        }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isRightClick()
+                && isBombLobbersActivatablePowerup(heldItem)
+                && !"wind-charge".equals(bombLobbersPowerupType(heldItem))
+                && !"speed-boost".equals(bombLobbersPowerupType(heldItem))) {
+            event.setCancelled(true);
+            useBombLobbersPowerup(session, player, heldItem);
             return;
         }
         if (session.type == ArcadePortGame.RUNNER) {
@@ -34796,12 +34811,26 @@ public final class ArcadePortManager implements Listener {
             session.bombNextPowerupSpawnAtByTeam.clear();
             return;
         }
+        boolean emitPowerupAura = now >= session.bombPowerupAuraNextAt;
+        if (emitPowerupAura) {
+            session.bombPowerupAuraNextAt = now + ArcadePortRules.bombLobbersPowerupAuraIntervalMillis();
+        }
         for (Map.Entry<UUID, Item> entry : new ArrayList<>(session.bombPowerupDrops.entrySet())) {
             Item drop = entry.getValue();
             if (drop == null || !drop.isValid()) {
                 session.bombPowerupDrops.remove(entry.getKey());
                 session.bombPowerupTeamByDrop.remove(entry.getKey());
                 if (drop != null) session.entities.remove(drop);
+                continue;
+            }
+            if (emitPowerupAura) {
+                Location center = drop.getLocation().add(0.0D, 0.25D, 0.0D);
+                for (int point = 0; point < 8; point++) {
+                    double angle = point * (Math.PI / 4.0D);
+                    session.world.spawnParticle(Particle.END_ROD,
+                            center.clone().add(Math.cos(angle) * 0.8D, 0.12D, Math.sin(angle) * 0.8D),
+                            1, 0.0D, 0.02D, 0.0D, 0.0D);
+                }
             }
         }
         if (bombLobbersOnlineMatchPlayers(session) <= 0) return;
@@ -34816,7 +34845,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost"};
+        String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost",
+                "jump-boost", "tnt-multiplier", "throw-strength", "regeneration",
+                "double-jump-boost", "direct-hit-protection"};
         for (int team = 0; team < 2; team++) {
             Location spawn = team == 0 ? redSpawn : blueSpawn;
             String powerup = choices[ThreadLocalRandom.current().nextInt(choices.length)];
@@ -34898,15 +34929,24 @@ public final class ArcadePortManager implements Listener {
     private ItemStack createBombLobbersPowerupStack(String type) {
         Material icon = switch (type) {
             case "wind-charge" -> Material.WIND_CHARGE;
-            case "super-tnt" -> Material.TNT;
+            case "super-tnt", "tnt-multiplier", "throw-strength" -> Material.TNT;
             case "fiery-tnt" -> Material.FIRE_CHARGE;
+            case "jump-boost", "double-jump-boost" -> Material.RABBIT_FOOT;
+            case "regeneration" -> Material.GHAST_TEAR;
+            case "direct-hit-protection" -> Material.SHIELD;
             default -> Material.SUGAR;
         };
         String lore = switch (type) {
             case "wind-charge" -> "Right-click to launch a gust that blasts opponents away.";
             case "super-tnt" -> "Throw this TNT for a bigger blast and stronger damage.";
-            case "fiery-tnt" -> "Throw this TNT to ignite opponents caught in its blast.";
-            default -> "Picked up instantly: Speed II for 12 seconds.";
+            case "fiery-tnt" -> "Throw this TNT to ignite opponents and nearby ground.";
+            case "jump-boost" -> "Right-click for Jump Boost II for 8 seconds.";
+            case "tnt-multiplier" -> "Throw this TNT for 50% more direct and blast damage.";
+            case "throw-strength" -> "Throw this TNT 40% faster.";
+            case "regeneration" -> "Right-click for brief health regeneration.";
+            case "double-jump-boost" -> "Right-click to strengthen your next double jump for 8 seconds.";
+            case "direct-hit-protection" -> "Right-click to halve direct-hit damage for 8 seconds.";
+            default -> "Right-click for Speed II for 12 seconds.";
         };
         ItemStack stack = namedItem(icon, ArcadePortRules.bombLobbersPowerupName(type), lore, 1);
         ItemMeta meta = stack.getItemMeta();
@@ -34929,6 +34969,13 @@ public final class ArcadePortManager implements Listener {
         return item.getType() == Material.TNT
                 || "super-tnt".equals(powerupType)
                 || "fiery-tnt".equals(powerupType);
+    }
+
+    private boolean isBombLobbersActivatablePowerup(ItemStack item) {
+        String type = bombLobbersPowerupType(item);
+        return "wind-charge".equals(type) || "speed-boost".equals(type)
+                || "jump-boost".equals(type) || "regeneration".equals(type)
+                || "double-jump-boost".equals(type) || "direct-hit-protection".equals(type);
     }
 
     private Integer bombLobbersPowerupTeam(ItemStack item) {
@@ -34990,6 +35037,39 @@ public final class ArcadePortManager implements Listener {
                 player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.5D, 0.35D, 0.04D);
         player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for "
                 + Math.max(1, (speedDurationTicks + 19) / 20) + " seconds.");
+    }
+
+    private void useBombLobbersPowerup(Session session, Player player, ItemStack held) {
+        if (session == null || active != session || player == null || held == null
+                || !session.alive.contains(player.getUniqueId())) return;
+        String type = bombLobbersPowerupType(held);
+        if (!"jump-boost".equals(type) && !"regeneration".equals(type)
+                && !"double-jump-boost".equals(type) && !"direct-hit-protection".equals(type)) return;
+        activateBombLobbersPowerup(session, player, held);
+        consumeHeld(player);
+        long now = System.currentTimeMillis();
+        int duration = ArcadePortRules.bombLobbersPowerupEffectDurationTicks();
+        switch (type) {
+            case "jump-boost" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, duration, 1, false, true));
+                player.sendMessage(ChatColor.GREEN + "Jump Boost II for 8 seconds!");
+            }
+            case "regeneration" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, duration, 0, false, true));
+                player.sendMessage(ChatColor.RED + "Regeneration for 8 seconds!");
+            }
+            case "double-jump-boost" -> {
+                session.bombDoubleJumpBoostUntil.put(player.getUniqueId(),
+                        now + ArcadePortRules.bombLobbersPowerupDoubleJumpDurationTicks() * 50L);
+                player.sendMessage(ChatColor.AQUA + "Your next double jump is empowered!");
+            }
+            case "direct-hit-protection" -> {
+                session.bombDirectHitProtectionUntil.put(player.getUniqueId(),
+                        now + ArcadePortRules.bombLobbersPowerupDirectHitProtectionTicks() * 50L);
+                player.sendMessage(ChatColor.GOLD + "Direct-hit protection for 8 seconds!");
+            }
+            default -> { }
+        }
     }
 
     private void updateBombLobbers(Session session) {
@@ -35172,8 +35252,12 @@ public final class ArcadePortManager implements Listener {
                 target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.7F);
                 owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
                 String directHitPowerup = session.bombPowerTypes.getOrDefault(bombId, "normal");
-                double directHitDamage = bombLobbersDamageAfterArmor(target,
-                        ArcadePortRules.bombLobbersDirectHitDamage(directHitPowerup));
+                double directRawDamage = ArcadePortRules.bombLobbersDirectHitDamage(directHitPowerup)
+                        * ArcadePortRules.bombLobbersPowerupTntDamageMultiplier(directHitPowerup);
+                directRawDamage = ArcadePortRules.bombLobbersDirectHitDamageAfterProtection(directRawDamage,
+                        ArcadePortRules.bombLobbersTimedPowerupActive(System.currentTimeMillis(),
+                                session.bombDirectHitProtectionUntil.getOrDefault(target.getUniqueId(), 0L)));
+                double directHitDamage = bombLobbersDamageAfterArmor(target, directRawDamage);
                 if (directHitDamage > 0.0D) {
                     showFloatingCombatLabel(session, target.getLocation(), "Direct Hit!", ChatColor.RED);
                     target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
@@ -35333,6 +35417,33 @@ public final class ArcadePortManager implements Listener {
         String cosmetic = owner == null ? "ember-ring"
                 : selectedGameCosmeticOption(owner, "bomb-lobbers", "tnt-explosions", "ember-ring");
         GameAbilityCosmetics.hit(owner, blast, cosmetic, "TNT Explosion");
+    }
+
+    private void igniteBombLobbersNearbyGround(Session session, Location blast) {
+        if (session == null || blast == null || blast.getWorld() != session.world) return;
+        List<Block> temporaryFire = new ArrayList<>();
+        int centerX = blast.getBlockX();
+        int centerZ = blast.getBlockZ();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if (dx * dx + dz * dz > 5) continue;
+                Block ground = session.world.getHighestBlockAt(centerX + dx, centerZ + dz);
+                if (ground == null) continue;
+                Block fire = ground.getRelative(0, 1, 0);
+                if (!ArcadePortRules.shouldIgniteBombLobbersBlock(
+                        fire.getType().isAir(), ground.getType().isSolid(), fire.isLiquid(), ground.isLiquid())) continue;
+                fire.setType(Material.FIRE, false);
+                temporaryFire.add(fire);
+                session.bombTemporaryFireBlocks.add(fire);
+            }
+        }
+        if (temporaryFire.isEmpty()) return;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Block fire : temporaryFire) {
+                session.bombTemporaryFireBlocks.remove(fire);
+                if (fire != null && fire.getType() == Material.FIRE) fire.setType(Material.AIR, false);
+            }
+        }, 60L);
     }
 
     private void removeBombTracking(Session session, UUID bombId) {
@@ -35530,6 +35641,7 @@ public final class ArcadePortManager implements Listener {
         if ("pitcher".equals(session.bombLobbersKits.getOrDefault(ownerId, "acrobat"))) {
             velocity = bombLobbersPitcherVelocity(session, player, spawn, velocity);
         }
+        velocity.multiply(ArcadePortRules.bombLobbersPowerupThrowVelocityMultiplier(powerupType));
         bomb.setVelocity(velocity);
         session.entities.add(bomb);
         session.bombOwners.put(bomb.getUniqueId(), ownerId);
@@ -35931,8 +36043,12 @@ public final class ArcadePortManager implements Listener {
                 player.getLocation().getDirection(), power, player.isOnGround());
         long now = System.currentTimeMillis();
         player.setFallDistance(0.0F);
+        boolean empoweredJump = ArcadePortRules.bombLobbersTimedPowerupActive(System.currentTimeMillis(),
+                session.bombDoubleJumpBoostUntil.getOrDefault(id, 0L));
+        if (empoweredJump) session.bombDoubleJumpBoostUntil.remove(id);
         session.bombDoubleJumpFallResetUntil.put(id,
                 ArcadePortRules.bombLobbersFallDistanceResetUntil(now));
+        velocity.multiply(ArcadePortRules.bombLobbersPowerupDoubleJumpMultiplier(empoweredJump));
         player.setVelocity(velocity);
         long readyAt = ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(now);
         session.bombDoubleJumpReadyAt.put(id, readyAt);
@@ -36148,6 +36264,9 @@ public final class ArcadePortManager implements Listener {
             session.entities.remove(bomb);
             bomb.remove();
             renderBombLobbersExplosion(session, blast, owner, bombPowerupType);
+            if (ArcadePortRules.bombLobbersTntIgnites(bombPowerupType)) {
+                igniteBombLobbersNearbyGround(session, blast);
+            }
             int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
                 // Reborn applies its nearby-player explosion condition without team filtering.
@@ -36167,6 +36286,7 @@ public final class ArcadePortManager implements Listener {
                 double blastDamage = ArcadePortRules.bombLobbersBlastDamage(
                         distance, exposure, bombBlastRadius,
                         ArcadePortRules.bombLobbersExplosionMaxDamage(bombPowerupType));
+                blastDamage *= ArcadePortRules.bombLobbersPowerupTntDamageMultiplier(bombPowerupType);
                 blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
                 if (ArcadePortRules.bombLobbersTntIgnites(bombPowerupType) && exposure > 0.05D) {
                     target.setFireTicks(100);

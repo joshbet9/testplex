@@ -29,6 +29,16 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] Attempt to exploit the opposing team's side; confirm the team-side restrictions prevent it.
 - [ ] Confirm players cannot receive duplicate damage/credit from one detonation.
 
+### Power-ups
+
+- [ ] Confirm each ground drop has a pulsing particle ring and displays its name.
+- [ ] Confirm Wind Charge, Speed Boost, Jump Boost, Regeneration, Double Jump Boost and Direct-Hit Protection activate by right-click and are consumed once.
+- [ ] Confirm Super TNT, TNT Multiplier, stronger TNT throw and Fiery TNT activate when that TNT is thrown.
+- [ ] Verify TNT Multiplier changes direct and blast damage, stronger throw changes velocity, and double-jump boost changes the next double-jump only while its timer is active.
+- [ ] Confirm Direct-Hit Protection halves direct-hit damage only for eight seconds.
+- [ ] Confirm Fiery TNT briefly ignites nearby clear ground, does not replace existing blocks, and restores temporary fire after three seconds or round cleanup.
+- [ ] Confirm the paired random wave schedule continues without a limit on uncollected drops.
+
 ### Kits
 
 - [ ] Acrobat: stronger double-jump activation, recharge, exhausted feedback and reset between rounds.

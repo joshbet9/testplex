@@ -501,6 +501,10 @@ class SessionState {
     final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
     final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
     final Map<UUID, String> bombPowerTypes = new HashMap<>();
+    final Map<UUID, Long> bombDirectHitProtectionUntil = new HashMap<>();
+    final Map<UUID, Long> bombDoubleJumpBoostUntil = new HashMap<>();
+    final Set<Block> bombTemporaryFireBlocks = new HashSet<>();
+    long bombPowerupAuraNextAt;
     final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
     long bombNextPowerupSpawnAt;
     final Map<UUID, Long> bombLastWallerAt = new HashMap<>();
