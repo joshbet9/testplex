@@ -222,6 +222,25 @@ final class DragonEscapeMovementKits {
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 
+    static final double DISRUPTOR_SELF_BOOST_SPEED = 0.9D;
+
+    static boolean shouldSelfTriggerDragonEscapeMine(
+            boolean sameOwner, boolean sneaking, int itemAgeTicks, double distanceToMine,
+            int armTicks, double triggerRadius) {
+        return sameOwner && sneaking && itemAgeTicks >= Math.max(0, armTicks)
+                && Double.isFinite(distanceToMine) && distanceToMine >= 0.0D
+                && Double.isFinite(triggerRadius) && triggerRadius >= 0.0D
+                && distanceToMine <= triggerRadius;
+    }
+
+    /** Aim pitch and yaw choose the complete three-dimensional launch direction. */
+    static Vector disruptorSelfBoostVelocity(Vector facing) {
+        if (facing == null || !Double.isFinite(facing.getX())
+                || !Double.isFinite(facing.getY()) || !Double.isFinite(facing.getZ())
+                || facing.lengthSquared() < 1.0E-8D) return new Vector();
+        return facing.clone().normalize().multiply(DISRUPTOR_SELF_BOOST_SPEED);
+    }
+
     static boolean shouldShowDragonEscapeLeapItem(int remainingUses) {
         return remainingUses > 0;
     }
