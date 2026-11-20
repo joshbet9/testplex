@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
 
 /**
@@ -13,6 +14,11 @@ final class BombLobbersPitcherTrajectory {
     private static final int MAX_FLIGHT_TICKS = 80;
 
     private BombLobbersPitcherTrajectory() {
+    }
+
+    static boolean isDestroyableBlock(Material material) {
+        return material != null && material.isBlock() && material.isSolid()
+                && material.getBlastResistance() < 13.0F;
     }
 
     static Vector selectTargetOffset(Vector directlyAimedOffset, Vector fallbackOffset) {
