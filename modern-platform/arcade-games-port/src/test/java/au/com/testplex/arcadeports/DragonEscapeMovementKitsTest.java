@@ -9,6 +9,16 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
+    void onlyDisruptorTntReceivesAdventurePlacementPermission() {
+        assertTrue(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.TNT, "Disruptor"));
+        assertFalse(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.TNT, "Other TNT"));
+        assertFalse(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.BRICKS, "Disruptor"));
+    }
+
+    @Test
     void featherBounceBeginsWithFiveChargesAndRejectsGroundClicks() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         assertEquals(5, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);

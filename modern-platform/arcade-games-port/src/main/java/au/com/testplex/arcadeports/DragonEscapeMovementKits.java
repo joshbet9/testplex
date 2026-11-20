@@ -224,6 +224,11 @@ final class DragonEscapeMovementKits {
 
     static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
 
+    /** Only the Disruptor's TNT ability item needs Adventure-mode block permission. */
+    static boolean shouldEnableDisruptorAdventurePlacement(org.bukkit.Material material, String displayName) {
+        return material == org.bukkit.Material.TNT && "Disruptor".equals(displayName);
+    }
+
     /** Only a top-face click on the block directly under the racer is a self-launch use. */
     static boolean shouldSelfLaunchDisruptorFromUnderfoot(
             boolean rightClickBlock, boolean topFace, boolean clickedSupportBlock, double feetClearance) {
