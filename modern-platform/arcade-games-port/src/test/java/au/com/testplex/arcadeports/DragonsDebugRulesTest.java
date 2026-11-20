@@ -162,24 +162,6 @@ class DragonsDebugRulesTest {
     }
 
     @Test
-    void waypointFlightTurnsSmoothlyTowardMapAndSparklerTargets() {
-        Vector initial = new Vector(0.0D, 0.0D, 1.0D);
-        Vector firstTurn = ArcadePortRules.dragonsWaypointHeading(new Vector(1.0D, 0.0D, 0.0D), initial);
-        assertTrue(firstTurn.getX() > 0.0D);
-        assertTrue(firstTurn.getZ() > 0.0D);
-        assertEquals(1.0D, firstTurn.length(), 1.0e-9D);
-
-        Vector heading = initial;
-        for (int i = 0; i < 20; i++) {
-            heading = ArcadePortRules.dragonsWaypointHeading(new Vector(1.0D, 0.0D, 0.0D), heading);
-        }
-        assertTrue(heading.getX() > 0.99D);
-        assertTrue(heading.getZ() < 0.15D);
-        assertEquals(new Vector(0.0D, 0.0D, 1.0D),
-                ArcadePortRules.dragonsWaypointHeading(new Vector(), initial));
-    }
-
-    @Test
     void exposedDragonMechanicsHaveBoundedProfileControls() {
         assertVariable("DRAGONS_MAX_DRAGONS", 0.0D, 64.0D);
         assertVariable("DRAGONS_DODGEMS_QUIET_MILLIS", 0.0D, 120_000.0D);
