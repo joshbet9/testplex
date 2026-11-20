@@ -1779,6 +1779,11 @@ public final class ArcadePortRules {
         return hasEntityTarget ? EnderDragon.Phase.CHARGE_PLAYER : EnderDragon.Phase.FLY_TO_PORTAL;
     }
 
+    /** Select racers immediately unless a nearby Sparkler has priority. */
+    public static boolean dragonsShouldAcquireRacer(int eligibleTargetCount, boolean hasSparklerTarget) {
+        return eligibleTargetCount > 0 && !hasSparklerTarget;
+    }
+
     /** Cancel pushes only between tracked dragons in the active Dragons match. */
     public static boolean shouldCancelDragonsEntityCollision(
             boolean dragonsGame, boolean firstTrackedDragon, boolean secondTrackedDragon) {
