@@ -236,7 +236,8 @@ final class DragonEscapeMovementKits {
                 && Double.isFinite(feetClearance) && feetClearance >= -0.05D && feetClearance <= 0.18D;
     }
 
-    static boolean hasDisruptorSupportClearance(boolean solidSupport, double clearance) {
+    static boolean hasDisruptorSupportClearance(boolean solidSupport, double feetY, double supportTopY) {
+        double clearance = feetY - supportTopY;
         return solidSupport && Double.isFinite(clearance) && clearance >= -0.05D && clearance <= 0.18D;
     }
 

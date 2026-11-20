@@ -177,12 +177,12 @@ class DragonEscapeMovementKitsTest {
 
     @Test
     void disruptorSupportHistoryAcceptsFullAndPartialBlockSurfaces() {
-        assertTrue(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 0.0D),
+        assertTrue(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 65.0D, 65.0D),
                 "A full block directly underfoot is accepted");
-        assertTrue(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 0.0D),
-                "A partial block top surface uses the same zero clearance");
-        assertFalse(DragonEscapeMovementKits.hasDisruptorSupportClearance(false, 0.0D));
-        assertFalse(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 0.5D));
+        assertTrue(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 64.5D, 64.5D),
+                "A slab uses its actual top surface");
+        assertFalse(DragonEscapeMovementKits.hasDisruptorSupportClearance(false, 65.0D, 65.0D));
+        assertFalse(DragonEscapeMovementKits.hasDisruptorSupportClearance(true, 65.5D, 65.0D));
     }
 
     @Test
