@@ -1459,9 +1459,13 @@ public final class ArcadePortManager implements Listener {
             String ability = held != null && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
                     ? ChatColor.stripColor(held.getItemMeta().getDisplayName()) : "";
             if ("Chaser Swap".equals(ability)) {
-                boolean usedBefore = session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+                long now = System.currentTimeMillis();
+                boolean readyBefore = DeathTagTricksterSwapRules.isReady(now,
+                        session.deathTagTricksterSwapReadyAt.getOrDefault(tester.getUniqueId(), 0L));
                 useDeathTagTricksterSwap(session, tester);
-                triggered = !usedBefore && session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+                triggered = readyBefore && !DeathTagTricksterSwapRules.isReady(
+                        System.currentTimeMillis(),
+                        session.deathTagTricksterSwapReadyAt.getOrDefault(tester.getUniqueId(), 0L));
             } else if ("Runner Distraction".equals(ability)) {
                 long now = System.currentTimeMillis();
                 long readyBefore = session.deathTagTricksterFireworksReadyAt.getOrDefault(
@@ -8620,13 +8624,26 @@ public final class ArcadePortManager implements Listener {
                 }
                 case "traitor" -> player.getInventory().addItem(namedItem(Material.IRON_AXE,
                         "Runner Traitor", "Heavy knockback on melee hits."));
-                case "turtle" -> player.getInventory().addItem(namedItem(Material.COPPER_AXE,
-                        "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn Wind Charges every 3 hits."));
+                case "turtle" -> {
+                    player.getInventory().addItem(namedItem(Material.COPPER_AXE,
+                            "Runner Turtle", "Hits weaken Chasers; gain a Wind Charge every 3 hits (max 3)."));
+                    player.getInventory().addItem(namedItem(Material.TURTLE_HELMET,
+                            "Shell Guard", "Right-click: 2.5s of half Chaser damage and counter-knockback; 30s cooldown."));
+                    updateDeathTagTurtleWindChargeBar(session, player);
+                }
                 case "trickster" -> {
                     player.getInventory().addItem(namedItem(Material.ENDER_EYE,
-                            "Chaser Swap", "Right-click to swap with a random living Chaser. One use."));
+                            "Chaser Swap", "Right-click to swap with a random grounded Chaser. 30-second cooldown."));
                     player.getInventory().addItem(namedItem(Material.FIREWORK_ROCKET,
-                            "Runner Distraction", "Right-click to launch fireworks from every other living Runner. 30-second cooldown."));
+                            "Runner Distraction", "Launch fireworks from other living Runners. 30-second cooldown."));
+                    player.getInventory().addItem(namedItem(Material.WATER_BUCKET,
+                            "MLG Water Bucket", "Real water placement; right-click to pre-arm a 5-second ping-safe clutch. 30s cooldown."));
+                    player.getInventory().addItem(namedItem(Material.COBWEB,
+                            "Trickster Cobweb", "Place a real temporary cobweb (8 seconds). Three uses.", 3));
+                    player.getInventory().addItem(namedItem(Material.INK_SAC,
+                            "Smoke Bomb", "One use: cloak and blind nearby Chasers, as in Sneaky Assassins."));
+                    player.getInventory().addItem(namedItem(Material.EGG,
+                            "Player Decoy Egg", "One use: deploy a player-skinned moving decoy for up to 10 seconds."));
                 }
                 case "null" -> { /* Reborn's NullKit has no kit items. */ }
                 default -> player.getInventory().addItem(namedItem(Material.IRON_SWORD,
@@ -8669,6 +8686,9 @@ public final class ArcadePortManager implements Listener {
             disguise.setPersistent(true);
             disguise.setRemoveWhenFarAway(false);
             disguise.setGravity(false);
+            if (disguise instanceof org.bukkit.entity.AbstractSkeleton skeleton) {
+                skeleton.setShouldBurnInDay(DeathTagChaserRules.shouldBurnInDaylight());
+            }
             disguise.setCollidable(false);
             disguise.setCanPickupItems(false);
             disguise.setCustomName(ChatColor.RED + player.getName());
@@ -9290,6 +9310,7 @@ public final class ArcadePortManager implements Listener {
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
         UUID convertedPlayerId = player.getUniqueId();
+        session.deathTagTricksterMechanics.removeDecoy(convertedPlayerId);
         UUID traitorId = session.deathTagAchievements.consumeTraitorAssist(convertedPlayerId,
                 System.currentTimeMillis());
         // Gallows credits a Traitor for knocking a fellow Runner into a Chaser's reach,
@@ -9433,16 +9454,10 @@ public final class ArcadePortManager implements Listener {
         if (session.deathTagAchievements.recordTurtleHit(runnerId, chaserId, now)) {
             awardCatalogAchievement(runner, "death-tag", "shell-shock");
         }
-        long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
-        long stackResetMillis = ArcadePortRules.deathTagTurtleStackResetMillis();
-        int stack = now - lastHit > stackResetMillis ? 1
-                : Math.min(ArcadePortRules.deathTagTurtleMaxStacks(),
-                        session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
-        session.deathTagTurtleStacksByChaser.put(chaserId, stack);
+        // Turtle protects itself rather than duplicating Basher's Chaser-slowing role.
         session.deathTagTurtleLastHitAt.put(chaserId, now);
         long effectTicks = ArcadePortRules.deathTagTurtleEffectDurationTicks();
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, (int) effectTicks, stack - 1, false, true, true), true);
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, (int) effectTicks, stack - 1, false, true, true), true);
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, (int) effectTicks, 0, false, true, true), true);
         Mob disguise = session.deathTagDisguises.get(chaserId);
         if (disguise != null && disguise.isValid() && disguise.getEquipment() != null) {
             disguise.getEquipment().setHelmet(new ItemStack(Material.TURTLE_HELMET));
@@ -9455,23 +9470,72 @@ public final class ArcadePortManager implements Listener {
             }, effectTicks);
         }
         runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 0.8F, 1.2F);
-        int charges = session.deathTagTurtleWindCharges.merge(runnerId, 1, Integer::sum);
-        int hitsPerWindCharge = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
-        if (charges >= hitsPerWindCharge) {
-            session.deathTagTurtleWindCharges.put(runnerId, charges - hitsPerWindCharge);
-            ItemStack windCharge = namedItem(Material.WIND_CHARGE, "Turtle Wind Charge",
-                    "Hit Chasers to earn more charges.");
-            Map<Integer, ItemStack> overflow = runner.getInventory().addItem(windCharge);
-            overflow.values().forEach(stackItem -> runner.getWorld().dropItemNaturally(runner.getLocation(), stackItem));
-            runner.sendMessage(ChatColor.AQUA + "Turtle shell formed a Wind Charge!");
+        int required = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
+        int held = deathTagTurtleWindChargeCount(runner);
+        int progress = session.deathTagTurtleWindCharges.getOrDefault(runnerId, 0);
+        DeathTagTurtleChargeProgress.HitResult result = DeathTagTurtleChargeProgress.recordHit(progress, required, held);
+        if (held >= DeathTagTurtleChargeProgress.MAX_HELD_CHARGES) {
+            session.deathTagTurtleWindCharges.remove(runnerId);
+        } else if (result.awardsCharge()) {
+            ItemStack charge = namedItem(Material.WIND_CHARGE, "Turtle Wind Charge", "Hit Chasers to earn more.");
+            if (runner.getInventory().addItem(charge).isEmpty()) {
+                session.deathTagTurtleWindCharges.remove(runnerId);
+                runner.sendMessage(ChatColor.AQUA + "Turtle shell formed a Wind Charge!");
+            } else {
+                session.deathTagTurtleWindCharges.put(runnerId, Math.max(0, required - 1));
+                runner.sendMessage(ChatColor.YELLOW + "Free an inventory slot to earn your Wind Charge.");
+            }
+        } else {
+            session.deathTagTurtleWindCharges.put(runnerId, result.hitProgress());
         }
+        updateDeathTagTurtleWindChargeBar(session, runner);
+    }
+
+    private int deathTagTurtleWindChargeCount(Player runner) {
+        int count = 0;
+        for (ItemStack item : runner.getInventory().getContents()) {
+            if (item != null && item.getType() == Material.WIND_CHARGE) count += item.getAmount();
+        }
+        return count;
+    }
+
+    private void updateDeathTagTurtleWindChargeBar(Session session, Player runner) {
+        if (session == null || runner == null || !runner.isOnline()) return;
+        UUID id = runner.getUniqueId();
+        int held = Math.min(DeathTagTurtleChargeProgress.MAX_HELD_CHARGES, deathTagTurtleWindChargeCount(runner));
+        int progress = session.deathTagTurtleWindCharges.getOrDefault(id, 0);
+        runner.setLevel(held);
+        runner.setExp(DeathTagTurtleChargeProgress.experienceProgress(progress,
+                ArcadePortRules.deathTagTurtleHitsPerWindCharge(), held));
+    }
+
+    private void useDeathTagTurtleGuard(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "turtle")) return;
+        UUID id = runner.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTurtleGuardReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            runner.sendActionBar(ChatColor.RED + "Shell Guard ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s");
+            return;
+        }
+        session.deathTagTurtleGuardUntil.put(id, now + DeathTagTurtleGuardRules.DURATION_MILLIS);
+        session.deathTagTurtleGuardReadyAt.put(id, now + DeathTagTurtleGuardRules.COOLDOWN_MILLIS);
+        runner.setCooldown(Material.TURTLE_HELMET, (int) (DeathTagTurtleGuardRules.COOLDOWN_MILLIS / 50L));
+        runner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                (int) (DeathTagTurtleGuardRules.DURATION_MILLIS / 50L), 0, false, false, true), true);
+        runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 1.0F, 0.75F);
+        runner.sendActionBar(ChatColor.GREEN + "Shell Guard active - Chaser hits are reduced!");
     }
 
     private void useDeathTagTricksterSwap(Session session, Player runner) {
         if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
         UUID id = runner.getUniqueId();
-        if (session.deathTagTricksterSwapUsed.contains(id)) {
-            runner.sendMessage(ChatColor.RED + "Your Chaser Swap has already been used this round.");
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTricksterSwapReadyAt.getOrDefault(id, 0L);
+        if (!DeathTagTricksterSwapRules.isReady(now, readyAt)) {
+            runner.sendActionBar(ChatColor.RED + "Chaser Swap ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s");
             return;
         }
         if (!runner.isOnGround()) {
@@ -9502,7 +9566,8 @@ public final class ArcadePortManager implements Listener {
         long graceUntil = System.currentTimeMillis() + 1_000L;
         session.deathTagRespawnGraceUntil.put(id, graceUntil);
         session.deathTagRespawnGraceUntil.put(target.getUniqueId(), graceUntil);
-        session.deathTagTricksterSwapUsed.add(id);
+        session.deathTagTricksterSwapReadyAt.put(id, now + DeathTagTricksterSwapRules.COOLDOWN_MILLIS);
+        runner.setCooldown(Material.ENDER_EYE, (int) (DeathTagTricksterSwapRules.COOLDOWN_MILLIS / 50L));
         if (nearbyChaser) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active == session && runner.isOnline() && session.alive.contains(id)
@@ -9511,7 +9576,6 @@ public final class ArcadePortManager implements Listener {
                 }
             }, 600L);
         }
-        runner.getInventory().remove(Material.ENDER_EYE);
         runner.playSound(runner.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.15F);
         target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.85F);
         runner.sendMessage(ChatColor.LIGHT_PURPLE + "You swapped places with " + target.getName() + "!");
@@ -23076,9 +23140,21 @@ public final class ArcadePortManager implements Listener {
                     break;
                 }
                 if (ArcadePortRules.shouldSpreadDeathTag(attackerChaser, targetChaser)) {
-                    applyDeathTagDefaultMeleeKnockback(attacker, target, false);
-                    double damage = ArcadePortRules.deathTagChaserDamage(
-                            session.alphaChasers.contains(attacker.getUniqueId()));
+                    boolean guarding = "turtle".equals(session.deathTagRunnerKits.get(target.getUniqueId()))
+                            && DeathTagTurtleGuardRules.isActive(System.currentTimeMillis(),
+                                    session.deathTagTurtleGuardUntil.getOrDefault(target.getUniqueId(), 0L));
+                    if (guarding) {
+                        Vector counter = attacker.getLocation().toVector().subtract(target.getLocation().toVector());
+                        if (counter.lengthSquared() > 0.001D) {
+                            attacker.setVelocity(counter.normalize().multiply(0.72D).setY(0.28D));
+                        }
+                        target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.85F, 1.0F);
+                    } else {
+                        applyDeathTagDefaultMeleeKnockback(attacker, target, false);
+                    }
+                    double damage = DeathTagTurtleGuardRules.damageAfterGuard(
+                            ArcadePortRules.deathTagChaserDamage(
+                                    session.alphaChasers.contains(attacker.getUniqueId())), guarding);
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
                         makeDeathTagChaser(session, target, "was killed by a chaser", attacker);
                         checkRoundEnd(session);
@@ -23936,6 +24012,9 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
             }
+        }
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            session.deathTagTricksterMechanics.close();
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             restoreBaconDashFireBlocks(session);
@@ -29848,6 +29927,19 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            if (session.deathTagTricksterMechanics.handleDecoyDamage(event, session.tagged)) return;
+            if (!event.isCancelled() && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                    && event.getEntity() instanceof Player runner
+                    && session.alive.contains(runner.getUniqueId())
+                    && !session.tagged.contains(runner.getUniqueId())
+                    && "trickster".equals(session.deathTagRunnerKits.get(runner.getUniqueId()))
+                    && debugKitFeatureEnabled(runner, ArcadePortGame.DEATH_TAG, "trickster")
+                    && session.deathTagTricksterMechanics.catchArmedClutch(plugin, runner)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
         // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
         // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
         boolean gladiatorPlayerHit = false;
@@ -31870,8 +31962,19 @@ public final class ArcadePortManager implements Listener {
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(player.getUniqueId())
                 && !session.tagged.contains(player.getUniqueId())
+                && "turtle".equals(session.deathTagRunnerKits.get(player.getUniqueId()))
+                && event.getHand() == EquipmentSlot.HAND && event.getAction().isRightClick()
+                && item == Material.TURTLE_HELMET && heldItem != null && heldItem.hasItemMeta()
+                && heldItem.getItemMeta().hasDisplayName()
+                && "Shell Guard".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
+            event.setCancelled(true);
+            useDeathTagTurtleGuard(session, player);
+            return;
+        }
+        if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(player.getUniqueId())
+                && !session.tagged.contains(player.getUniqueId())
                 && "trickster".equals(session.deathTagRunnerKits.get(player.getUniqueId()))
-                && event.getAction().isRightClick()) {
+                && event.getHand() == EquipmentSlot.HAND && event.getAction().isRightClick()) {
             String ability = heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
                     ? ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()) : "";
             if ("Chaser Swap".equals(ability)) {
@@ -31882,6 +31985,33 @@ public final class ArcadePortManager implements Listener {
             if ("Runner Distraction".equals(ability)) {
                 event.setCancelled(true);
                 useDeathTagTricksterFireworks(session, player);
+                return;
+            }
+            if ("MLG Water Bucket".equals(ability) && item == Material.WATER_BUCKET) {
+                event.setCancelled(true);
+                if (isDebugAbilityAllowed(player, ArcadePortGame.DEATH_TAG, "trickster"))
+                    session.deathTagTricksterMechanics.useWater(plugin, player,
+                            event.getClickedBlock(), event.getBlockFace());
+                return;
+            }
+            if ("Trickster Cobweb".equals(ability) && item == Material.COBWEB) {
+                event.setCancelled(true);
+                if (isDebugAbilityAllowed(player, ArcadePortGame.DEATH_TAG, "trickster"))
+                    session.deathTagTricksterMechanics.placeWeb(plugin, player,
+                            event.getClickedBlock(), event.getBlockFace());
+                return;
+            }
+            if ("Smoke Bomb".equals(ability) && item == Material.INK_SAC) {
+                event.setCancelled(true);
+                if (isDebugAbilityAllowed(player, ArcadePortGame.DEATH_TAG, "trickster"))
+                    session.deathTagTricksterMechanics.useSmoke(player,
+                            session.tagged.stream().map(session.players::get).toList());
+                return;
+            }
+            if ("Player Decoy Egg".equals(ability) && item == Material.EGG) {
+                event.setCancelled(true);
+                if (isDebugAbilityAllowed(player, ArcadePortGame.DEATH_TAG, "trickster"))
+                    session.deathTagTricksterMechanics.deployDecoy(plugin, player);
                 return;
             }
         }
@@ -34367,6 +34497,14 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.MICRO_BATTLES
                 && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeathTagTricksterWaterFlow(BlockFromToEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DEATH_TAG
+                && event.getBlock().getWorld() == session.world)
+            session.deathTagTricksterMechanics.trackWaterFlow(event);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
