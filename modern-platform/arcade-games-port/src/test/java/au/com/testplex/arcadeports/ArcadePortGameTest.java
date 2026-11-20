@@ -1114,11 +1114,11 @@ class ArcadePortGameTest {
         assertEquals("Red", ArcadePortRules.bombLobbersTeamBadgeName(-1));
     }
 
-    @Test void bombLobbersJumperAndWallerInheritTheLegacyTeamArmorModule() {
+    @Test void bombLobbersJumperWallerAndPitcherInheritTheLegacyTeamArmorModule() {
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("jumper"));
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("waller"));
+        assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("pitcher"));
         assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("armorer"));
-        assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("pitcher"));
         assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("unknown"));
         assertEquals(8, ArcadePortRules.BOMB_LOBBERS_TEAM_BADGE_SLOT);
         assertEquals(org.bukkit.Color.RED, ArcadePortRules.bombLobbersTeamColor(0));
@@ -1147,7 +1147,7 @@ class ArcadePortGameTest {
         assertEquals("acrobat", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("acrobat", ArcadePortRules.normalizeBombLobbersKit("Acrobat"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
-        assertNull(ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
+        assertEquals("pitcher", ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
         assertEquals("constructor", ArcadePortRules.normalizeBombLobbersKit("Waller"));
         assertEquals("constructor", ArcadePortRules.normalizeBombLobbersKit("Constructor"));
         assertNull(ArcadePortRules.normalizeBombLobbersKit("unknown"));
