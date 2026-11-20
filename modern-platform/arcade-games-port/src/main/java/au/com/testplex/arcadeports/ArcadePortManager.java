@@ -13898,9 +13898,11 @@ public final class ArcadePortManager implements Listener {
 
     private ItemStack namedItem(Material type, String title, String lore, int amount) {
         ItemStack item = new ItemStack(type, amount);
-        if (type == Material.TNT && "Disruptor".equals(title)) {
+        if (DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(type, title)) {
             item.setData(io.papermc.paper.datacomponent.DataComponentTypes.CAN_PLACE_ON,
-                    DragonEscapeMovementKits.disruptorAdventurePlacementPredicate());
+                    io.papermc.paper.datacomponent.item.ItemAdventurePredicate.itemAdventurePredicate()
+                    .addPredicate(io.papermc.paper.block.BlockPredicate.predicate().build())
+                    .build());
         }
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {

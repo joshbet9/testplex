@@ -9,11 +9,13 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
-    void disruptorAdventurePredicateAllowsEveryMapSurface() {
-        var predicate = DragonEscapeMovementKits.disruptorAdventurePlacementPredicate();
-        assertEquals(1, predicate.predicates().size());
-        assertNull(predicate.predicates().get(0).blocks(),
-                "An empty block predicate keeps TNT use available on all map surfaces in Adventure mode");
+    void onlyDisruptorTntReceivesAdventurePlacementPermission() {
+        assertTrue(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.TNT, "Disruptor"));
+        assertFalse(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.TNT, "Other TNT"));
+        assertFalse(DragonEscapeMovementKits.shouldEnableDisruptorAdventurePlacement(
+                org.bukkit.Material.BRICKS, "Disruptor"));
     }
 
     @Test

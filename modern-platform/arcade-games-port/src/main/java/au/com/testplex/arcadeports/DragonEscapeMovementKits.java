@@ -224,15 +224,9 @@ final class DragonEscapeMovementKits {
 
     static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
 
-    /**
-     * Adventure-mode item predicate allowing the Disruptor to target any
-     * course surface. The interaction event is cancelled after it is handled,
-     * so this never permits a TNT block to remain placed.
-     */
-    static io.papermc.paper.datacomponent.item.ItemAdventurePredicate disruptorAdventurePlacementPredicate() {
-        return io.papermc.paper.datacomponent.item.ItemAdventurePredicate.itemAdventurePredicate()
-                .addPredicate(io.papermc.paper.block.BlockPredicate.predicate().build())
-                .build();
+    /** Only the Disruptor's TNT ability item needs Adventure-mode block permission. */
+    static boolean shouldEnableDisruptorAdventurePlacement(org.bukkit.Material material, String displayName) {
+        return material == org.bukkit.Material.TNT && "Disruptor".equals(displayName);
     }
 
     /** Only a top-face click on the block directly under the racer is a self-launch use. */
