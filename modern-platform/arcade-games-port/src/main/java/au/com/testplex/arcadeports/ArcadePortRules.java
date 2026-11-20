@@ -649,7 +649,8 @@ public final class ArcadePortRules {
     public static final int BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_DURATION_TICKS = 160;
     public static final int BOMB_LOBBERS_POWERUP_DIRECT_HIT_PROTECTION_TICKS = 160;
     public static final double BOMB_LOBBERS_POWERUP_DIRECT_HIT_REDUCTION = 0.5D;
-    public static final double BOMB_LOBBERS_POWERUP_TNT_DAMAGE_MULTIPLIER = 1.5D;
+    public static final double BOMB_LOBBERS_POWERUP_TNT_RATE_MULTIPLIER = 1.5D;
+    public static final long BOMB_LOBBERS_POWERUP_TNT_RATE_DURATION_MILLIS = 15_000L;
     public static final double BOMB_LOBBERS_POWERUP_THROW_VELOCITY_MULTIPLIER = 1.4D;
     public static final double BOMB_LOBBERS_POWERUP_DOUBLE_JUMP_MULTIPLIER = 1.35D;
     public static final long BOMB_LOBBERS_POWERUP_AURA_INTERVAL_MILLIS = 500L;
@@ -2159,9 +2160,21 @@ public final class ArcadePortRules {
         return "fiery-tnt".equalsIgnoreCase(powerupType);
     }
 
-    public static double bombLobbersPowerupTntDamageMultiplier(String powerupType) {
+    public static double bombLobbersPowerupTntRateMultiplier(String powerupType) {
         return "tnt-multiplier".equalsIgnoreCase(powerupType)
-                ? BOMB_LOBBERS_POWERUP_TNT_DAMAGE_MULTIPLIER : 1.0D;
+                ? BOMB_LOBBERS_POWERUP_TNT_RATE_MULTIPLIER : 1.0D;
+    }
+
+    /** Shared supply rate: survivor eliminations provide 70% of the ramp and time 30%. */
+    public static double bombLobbersTntMultiplier(
+            int initialPlayers, int alivePlayers, long elapsedMillis, long roundDurationMillis) {
+        if (initialPlayers <= 0) return 1.0D;
+        int alive = Math.max(0, Math.min(initialPlayers, alivePlayers));
+        long duration = Math.max(1L, roundDurationMillis);
+        long elapsed = Math.max(0L, Math.min(duration, elapsedMillis));
+        double eliminatedFraction = (initialPlayers - alive) / (double) initialPlayers;
+        double timeFraction = elapsed / (double) duration;
+        return 1.0D + 0.7D * eliminatedFraction + 0.3D * timeFraction;
     }
 
     public static double bombLobbersPowerupThrowVelocityMultiplier(String powerupType) {
@@ -2424,14 +2437,35 @@ public final class ArcadePortRules {
         return firstReady > Long.MAX_VALUE - interval ? Long.MAX_VALUE : firstReady + interval;
     }
 
-    /** Clears stale pre-launch fall accumulation for the first few physics ticks after a perk jump. */
+    /** The Pitcher perk changes throw physics, never the shared TNT item identity. */
+    public static String bombLobbersTntItemName(String kit) {
+        return "Throwing TNT";
+    }
+
+    public static int firstEmptyBombLobbersPowerupSlot(String kit, boolean[] occupiedHotbarSlots) {
+        if (occupiedHotbarSlots == null || occupiedHotbarSlots.length < 9) return -1;
+        int firstPowerupSlot = "constructor".equalsIgnoreCase(kit) ? 2 : 1;
+        for (int slot = firstPowerupSlot; slot < 9; slot++) {
+            if (!occupiedHotbarSlots[slot]) return slot;
+        }
+        return -1;
+    }
+
+    /** Keeps jump-generated fall distance clear until that double-jump flight lands. */
     public static long bombLobbersFallDistanceResetUntil(long nowMillis) {
-        long now = Math.max(0L, nowMillis);
-        return now > Long.MAX_VALUE - 200L ? Long.MAX_VALUE : now + 200L;
+        return Long.MAX_VALUE;
     }
 
     public static boolean shouldResetBombLobbersFallDistance(long nowMillis, long resetUntilMillis) {
-        return resetUntilMillis > 0L && nowMillis <= resetUntilMillis;
+        return resetUntilMillis == Long.MAX_VALUE || resetUntilMillis > 0L && nowMillis <= resetUntilMillis;
+    }
+
+    public static boolean shouldEndBombLobbersFallDistanceReset(boolean grounded, boolean airborneSinceJump) {
+        return grounded && airborneSinceJump;
+    }
+
+    public static boolean shouldCancelBombLobbersDoubleJumpFallDamage(boolean alive, boolean resetActive) {
+        return alive && resetActive;
     }
 
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
@@ -2440,6 +2474,34 @@ public final class ArcadePortRules {
         if (liveMillis <= 60_000L) return 6_000L;
         if (liveMillis <= 620_000L) return 5_000L;
         return 4_000L;
+    }
+
+    public static long bombLobbersCraftmanIntervalMillis(long liveMillis, double multiplier) {
+        long base = bombLobbersCraftmanIntervalMillis(liveMillis);
+        if (!Double.isFinite(multiplier) || multiplier <= 0.0D) return base;
+        return Math.max(1L, (long) Math.ceil(base / multiplier));
+    }
+
+    /** Reschedules an already-running refill so the rate boost takes effect immediately. */
+    public static long bombLobbersAcceleratedCraftAt(
+            long nowMillis, long nextCraftAtMillis, long boostDurationMillis, double multiplier) {
+        long now = Math.max(0L, nowMillis);
+        if (nextCraftAtMillis <= now) return now;
+        long duration = Math.max(0L, boostDurationMillis);
+        if (!Double.isFinite(multiplier) || multiplier <= 1.0D || duration == 0L) return nextCraftAtMillis;
+        long remaining = nextCraftAtMillis - now;
+        double boostedRemaining = remaining / multiplier;
+        if (boostedRemaining <= duration) {
+            return now + Math.max(1L, (long) Math.ceil(boostedRemaining));
+        }
+        double remainderAfterBoost = remaining - duration * multiplier;
+        return now + duration + Math.max(1L, (long) Math.ceil(remainderAfterBoost));
+    }
+
+    public static long bombLobbersTntRatePowerupExpiresAt(long nowMillis) {
+        long now = Math.max(0L, nowMillis);
+        return now > Long.MAX_VALUE - BOMB_LOBBERS_POWERUP_TNT_RATE_DURATION_MILLIS
+                ? Long.MAX_VALUE : now + BOMB_LOBBERS_POWERUP_TNT_RATE_DURATION_MILLIS;
     }
 
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {

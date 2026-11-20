@@ -501,6 +501,8 @@ class SessionState {
     final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
     final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
     final Map<UUID, String> bombPowerTypes = new HashMap<>();
+    final Map<UUID, String> bombNextThrowPowerupByPlayer = new HashMap<>();
+    final Map<UUID, Long> bombTntRatePowerupUntil = new HashMap<>();
     final Map<UUID, Long> bombDirectHitProtectionUntil = new HashMap<>();
     final Map<UUID, Long> bombDoubleJumpBoostUntil = new HashMap<>();
     final Set<Block> bombTemporaryFireBlocks = new HashSet<>();
@@ -544,6 +546,9 @@ class SessionState {
     final Map<UUID, Long> bombDoubleJumpFallResetUntil = new HashMap<>();
     final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
     final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
+    org.bukkit.boss.BossBar bombTntMultiplierBossBar;
+    long bombNextTntMultiplierBarUpdateAt;
+    int bombInitialPlayerCount;
     long bombNextBoundaryCheckAt;
     long bombNextCompassUpdateAt;
     final Map<UUID, Map<Integer, UUID>> bombCompassMenuTargets = new HashMap<>();

@@ -64,8 +64,8 @@ class BombLobbersDebugRulesTest {
         assertEquals("Double Jump Boost", ArcadePortRules.bombLobbersPowerupName("double-jump-boost"));
         assertEquals("Direct-Hit Protection", ArcadePortRules.bombLobbersPowerupName("direct-hit-protection"));
 
-        assertEquals(1.5D, ArcadePortRules.bombLobbersPowerupTntDamageMultiplier("tnt-multiplier"));
-        assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupTntDamageMultiplier("normal"));
+        assertEquals(1.5D, ArcadePortRules.bombLobbersPowerupTntRateMultiplier("tnt-multiplier"));
+        assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupTntRateMultiplier("normal"));
         assertEquals(1.4D, ArcadePortRules.bombLobbersPowerupThrowVelocityMultiplier("throw-strength"));
         assertEquals(1.0D, ArcadePortRules.bombLobbersPowerupThrowVelocityMultiplier("normal"));
         assertEquals(1.35D, ArcadePortRules.bombLobbersPowerupDoubleJumpMultiplier(true));
