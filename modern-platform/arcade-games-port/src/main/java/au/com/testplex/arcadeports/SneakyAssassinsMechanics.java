@@ -74,6 +74,7 @@ final class SneakyAssassinsMechanics {
 
     private World world;
     private List<Location> powerUpLocations = List.of();
+    private List<Location> configuredNpcSpawns = List.of();
     private final Map<UUID, Player> players = new LinkedHashMap<>();
     private Predicate<UUID> isAlive = ignored -> false;
     private Eliminator eliminator = (victim, killer, reason) -> { };
@@ -206,6 +207,18 @@ final class SneakyAssassinsMechanics {
                 : (int) Math.max(0L, (nextGlobalRevealAt - now + 999L) / 1_000L);
         return "power-ups " + count + "/" + SneakyAssassinsRules.maxPowerUpProgress() + " | "
                 + (masterAssassins.contains(playerId) ? "MASTER" : "reveal " + seconds + "s");
+    }
+
+    /** Flat debug arena only; never touches the existing authored/procedural map. */
+    void buildFlatTestArena(World world) {
+        for (int x = -50; x < 50; x++) {
+            for (int z = -50; z < 50; z++) {
+                world.getBlockAt(x, 63, z).setType(Material.STONE_BRICKS, false);
+                for (int y = 64; y <= 70; y++) {
+                    world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                }
+            }
+        }
     }
 
     void buildArena(World world) {
@@ -348,6 +361,15 @@ final class SneakyAssassinsMechanics {
         stop();
         this.world = world;
         this.powerUpLocations = resolvePowerUpLocations(world, mapData);
+        this.configuredNpcSpawns = mapData == null ? List.of() : mapData.dataLocations("YELLOW").stream()
+                .filter(location -> location.getWorld() == world).map(Location::clone).toList();
+        // Remove legacy persistent villagers left behind by earlier test rounds.
+        // Only the dedicated test world gets an unrestricted NPC cleanup.
+        if (world != null && "arcadeport_sneaky_assassins_flat_test".equals(world.getName())) {
+            for (Entity entity : world.getEntities()) {
+                if (entity instanceof Villager) entity.remove();
+            }
+        }
         this.isAlive = alive;
         this.eliminator = eliminator;
         for (Player player : participants) {
@@ -551,7 +573,7 @@ final class SneakyAssassinsMechanics {
         Villager npc = world.spawn(location, Villager.class);
         npc.setAI(SneakyAssassinsRules.ambientVillagerAiEnabled());
         npc.setSilent(true);
-        npc.setPersistent(true);
+        npc.setPersistent(false);
         npc.setRemoveWhenFarAway(false);
         npc.setCanPickupItems(false);
         npc.setCollidable(false);
@@ -565,6 +587,12 @@ final class SneakyAssassinsMechanics {
      */
     private void prepareNpcPatrolAnchors() {
         npcPatrolAnchors.clear();
+        if (!configuredNpcSpawns.isEmpty()) {
+            for (Location spawn : configuredNpcSpawns) {
+                if (isSafeNpcPatrolDestination(spawn)) npcPatrolAnchors.add(spawn.clone());
+            }
+            return;
+        }
         for (int x = -20; x <= 20; x += 2) {
             for (int z = -20; z <= 20; z += 2) {
                 // Match the four procedural house footprints; NPC patrol points stay on the lanes.
@@ -604,6 +632,11 @@ final class SneakyAssassinsMechanics {
     }
 
     private Location randomSafeTownLocation() {
+        if (!configuredNpcSpawns.isEmpty()) {
+            List<Location> safe = configuredNpcSpawns.stream()
+                    .filter(this::isSafeNpcPatrolDestination).toList();
+            if (!safe.isEmpty()) return safe.get(ThreadLocalRandom.current().nextInt(safe.size())).clone();
+        }
         for (int attempt = 0; attempt < SneakyAssassinsRules.npcSpawnSearchAttempts(); attempt++) {
             int x = ThreadLocalRandom.current().nextInt(-20, 21);
             int z = ThreadLocalRandom.current().nextInt(-20, 21);
@@ -1569,6 +1602,7 @@ final class SneakyAssassinsMechanics {
         lastPowerUpLocation = null;
         world = null;
         powerUpLocations = List.of();
+        configuredNpcSpawns = List.of();
         isAlive = ignored -> false;
         eliminator = (victim, killer, reason) -> { };
         nextPowerUpAt = nextGlobalRevealAt = globalRevealEndsAt = 0L;
