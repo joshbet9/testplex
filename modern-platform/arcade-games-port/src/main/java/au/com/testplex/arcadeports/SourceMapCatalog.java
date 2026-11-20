@@ -2215,6 +2215,42 @@ public final class SourceMapCatalog {
         catch (NumberFormatException ignored) { return fallback; }
     }
 
+    /**
+     * Explicit, in-memory datapoints for the isolated 100x100 Sneaky Assassins test plane.
+     * This must never be saved over an authentic source map's WorldConfig.
+     */
+    public static MapData sneakyAssassinsFlatTestData(World world) {
+        MapData data = new MapData();
+        data.mapName = "Sneaky Assassins 100x100 Test";
+        data.minX = -50; data.maxX = 49;
+        data.minZ = -50; data.maxZ = 49;
+        data.minY = 63; data.maxY = 70;
+        data.hasMinX = data.hasMaxX = data.hasMinZ = data.hasMaxZ = true;
+        data.hasMinY = data.hasMaxY = true;
+        List<Location> starts = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            double angle = 2.0D * Math.PI * i / 16.0D;
+            starts.add(new Location(world, Math.cos(angle) * 38.0D + 0.5D, 64.0D,
+                    Math.sin(angle) * 38.0D + 0.5D, (float) Math.toDegrees(angle) + 90.0F, 0.0F));
+        }
+        data.teamSpawns.put("TEAM_0", starts);
+        data.dataLocations.put("RED", List.of(
+                new Location(world, -25.5D, 64.0D, -25.5D),
+                new Location(world, 25.5D, 64.0D, -25.5D),
+                new Location(world, -25.5D, 64.0D, 25.5D),
+                new Location(world, 25.5D, 64.0D, 25.5D)));
+        data.dataLocations.put("YELLOW", List.of(
+                new Location(world, -15.5D, 64.0D, -15.5D),
+                new Location(world, 15.5D, 64.0D, -15.5D),
+                new Location(world, -15.5D, 64.0D, 15.5D),
+                new Location(world, 15.5D, 64.0D, 15.5D),
+                new Location(world, 0.5D, 64.0D, -20.5D),
+                new Location(world, 20.5D, 64.0D, 0.5D),
+                new Location(world, 0.5D, 64.0D, 20.5D),
+                new Location(world, -20.5D, 64.0D, 0.5D)));
+        return data;
+    }
+
     public static final class MapData {
         private String mapName = "Unknown";
         private boolean inferredMetadata;
