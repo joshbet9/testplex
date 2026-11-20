@@ -8422,8 +8422,12 @@ public final class ArcadePortManager implements Listener {
                 }
                 case "traitor" -> player.getInventory().addItem(namedItem(Material.IRON_AXE,
                         "Runner Traitor", "Heavy knockback on melee hits."));
-                case "turtle" -> player.getInventory().addItem(namedItem(Material.COPPER_AXE,
-                        "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn up to 3 Wind Charges every 3 hits."));
+                case "turtle" -> {
+                    player.getInventory().addItem(namedItem(Material.COPPER_AXE,
+                            "Runner Turtle", "Hits weaken Chasers and earn a Wind Charge every 3 hits (max 3)."));
+                    player.getInventory().addItem(namedItem(Material.TURTLE_HELMET,
+                            "Shell Guard", "Right-click for 2.5s of half damage and counter-knockback. Slows you; 30s cooldown."));
+                }
                 case "trickster" -> {
                     player.getInventory().addItem(namedItem(Material.ENDER_EYE,
                             "Chaser Swap", "Right-click to swap with a random living Chaser. One use."));
@@ -9225,16 +9229,10 @@ public final class ArcadePortManager implements Listener {
         if (session.deathTagAchievements.recordTurtleHit(runnerId, chaserId, now)) {
             awardCatalogAchievement(runner, "death-tag", "shell-shock");
         }
-        long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
-        long stackResetMillis = ArcadePortRules.deathTagTurtleStackResetMillis();
-        int stack = now - lastHit > stackResetMillis ? 1
-                : Math.min(ArcadePortRules.deathTagTurtleMaxStacks(),
-                        session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
-        session.deathTagTurtleStacksByChaser.put(chaserId, stack);
+        // Turtle is defensive; unlike Basher it does not slow pursuers or stack crowd control.
         session.deathTagTurtleLastHitAt.put(chaserId, now);
         long effectTicks = ArcadePortRules.deathTagTurtleEffectDurationTicks();
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, (int) effectTicks, stack - 1, false, true, true), true);
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, (int) effectTicks, stack - 1, false, true, true), true);
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, (int) effectTicks, 0, false, true, true), true);
         Mob disguise = session.deathTagDisguises.get(chaserId);
         if (disguise != null && disguise.isValid() && disguise.getEquipment() != null) {
             disguise.getEquipment().setHelmet(new ItemStack(Material.TURTLE_HELMET));
@@ -9288,6 +9286,26 @@ public final class ArcadePortManager implements Listener {
         int hitsPerCharge = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
         runner.setLevel(held);
         runner.setExp(DeathTagTurtleChargeProgress.experienceProgress(hits, hitsPerCharge, held));
+    }
+
+    private void useDeathTagTurtleGuard(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "turtle")) return;
+        UUID id = runner.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTurtleGuardReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            runner.sendActionBar(ChatColor.RED + "Shell Guard recharges in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s");
+            return;
+        }
+        session.deathTagTurtleGuardUntil.put(id, now + DeathTagTurtleGuardRules.DURATION_MILLIS);
+        session.deathTagTurtleGuardReadyAt.put(id, now + DeathTagTurtleGuardRules.COOLDOWN_MILLIS);
+        runner.setCooldown(Material.TURTLE_HELMET, (int) (DeathTagTurtleGuardRules.COOLDOWN_MILLIS / 50L));
+        // A deliberate mobility trade-off: Turtle is sturdy during a chase, not a faster Basher.
+        runner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                (int) (DeathTagTurtleGuardRules.DURATION_MILLIS / 50L), 0, false, false, true), true);
+        runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 1.0F, 0.75F);
+        runner.sendActionBar(ChatColor.GREEN + "Shell Guard active - counter incoming Chaser hits!");
     }
 
     private void useDeathTagTricksterSwap(Session session, Player runner) {
@@ -22385,9 +22403,22 @@ public final class ArcadePortManager implements Listener {
                     break;
                 }
                 if (ArcadePortRules.shouldSpreadDeathTag(attackerChaser, targetChaser)) {
-                    applyDeathTagDefaultMeleeKnockback(attacker, target, false);
-                    double damage = ArcadePortRules.deathTagChaserDamage(
-                            session.alphaChasers.contains(attacker.getUniqueId()));
+                    boolean guarding = "turtle".equals(session.deathTagRunnerKits.get(target.getUniqueId()))
+                            && DeathTagTurtleGuardRules.isActive(System.currentTimeMillis(),
+                                    session.deathTagTurtleGuardUntil.getOrDefault(target.getUniqueId(), 0L));
+                    if (guarding) {
+                        org.bukkit.util.Vector counter = attacker.getLocation().toVector()
+                                .subtract(target.getLocation().toVector());
+                        if (counter.lengthSquared() > 0.001D) {
+                            attacker.setVelocity(counter.normalize().multiply(0.72D).setY(0.28D));
+                        }
+                        target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.85F, 1.0F);
+                    } else {
+                        applyDeathTagDefaultMeleeKnockback(attacker, target, false);
+                    }
+                    double damage = DeathTagTurtleGuardRules.damageAfterGuard(
+                            ArcadePortRules.deathTagChaserDamage(
+                                    session.alphaChasers.contains(attacker.getUniqueId())), guarding);
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
                         makeDeathTagChaser(session, target, "was killed by a chaser", attacker);
                         checkRoundEnd(session);
@@ -30638,6 +30669,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(player.getUniqueId())
+                && !session.tagged.contains(player.getUniqueId())
+                && "turtle".equals(session.deathTagRunnerKits.get(player.getUniqueId()))
+                && event.getAction().isRightClick() && item == Material.TURTLE_HELMET
+                && heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
+                && "Shell Guard".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
+            event.setCancelled(true);
+            useDeathTagTurtleGuard(session, player);
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(player.getUniqueId())
                 && !session.tagged.contains(player.getUniqueId())
                 && "trickster".equals(session.deathTagRunnerKits.get(player.getUniqueId()))
