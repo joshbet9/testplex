@@ -5418,6 +5418,9 @@ public final class ArcadePortManager implements Listener {
                     + mapName + ". The map was preserved and no generated platform was added; check server logs.");
             return;
         }
+        // Legacy map archives can contain leftover fake player/NPC carriers.
+        // Evolution uses neither squids nor iron golems as gameplay entities.
+        if (type == ArcadePortGame.EVOLUTION) cleanupEvolutionStrayMapEntities(world);
         SourceMapCatalog.MapData selectedMapData = sourceMapData.get(type.id());
         boolean inferredMasterBuildersMap = type == ArcadePortGame.MASTER_BUILDERS
                 && selectedMapData != null && selectedMapData.inferredMetadata();
@@ -7725,6 +7728,18 @@ public final class ArcadePortManager implements Listener {
                     + session.scores.getOrDefault(player.getUniqueId(), 0));
         }
         return lines;
+    }
+
+    private void cleanupEvolutionStrayMapEntities(World world) {
+        if (world == null) return;
+        int removed = 0;
+        for (Entity entity : world.getEntities()) {
+            if (entity.getType() != EntityType.IRON_GOLEM && entity.getType() != EntityType.SQUID) continue;
+            entity.remove();
+            removed++;
+        }
+        if (removed > 0) plugin.getLogger().info("Removed " + removed
+                + " stray iron golem/squid entities from Evolution world " + world.getName() + ".");
     }
 
     private String sharedMatchObjective(ArcadePortGame type) {
@@ -14727,6 +14742,9 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
+        // Clean up carrier entities from lazily loaded Evolution map chunks too.
+        if (session.type == ArcadePortGame.EVOLUTION && session.ticks % 20L == 0L)
+            cleanupEvolutionStrayMapEntities(session.world);
         if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionScoreboards(session, now);
         else if (!session.sharedMatchScoreboards.isEmpty()) updateSharedMatchScoreboard(session, now);
         if (session.liveStarted) updateLegacyNaturalRegeneration(session);
