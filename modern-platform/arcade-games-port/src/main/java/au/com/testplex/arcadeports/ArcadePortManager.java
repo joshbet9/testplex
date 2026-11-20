@@ -18134,7 +18134,8 @@ public final class ArcadePortManager implements Listener {
                 releaseAcrobatWallCling(session, player);
             } else if (!acrobat.gravityManaged) {
                 acrobat.gravityBeforeCling = player.hasGravity();
-                acrobat.clingAnchor = player.getLocation().clone();
+                acrobat.clingAnchor = DragonEscapeMovementKits.wallClingAnchor(
+                        player.getLocation(), contactNormal);
                 acrobat.clingHeight = acrobat.clingAnchor.getY();
                 player.setGravity(false);
                 acrobat.gravityManaged = true;
