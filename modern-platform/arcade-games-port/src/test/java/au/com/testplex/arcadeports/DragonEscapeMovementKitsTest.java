@@ -216,6 +216,29 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void acrobatWallClingAnchorMovesOutOfWallWithoutChangingHeightOrAim() {
+        Location contact = new Location(null, 10.5D, 72.25D, -4.5D, 38.0F, -12.0F);
+        assertEquals(0.04D, DragonEscapeMovementKits.WALL_CLING_WALL_CLEARANCE, 0.00001D);
+
+        for (Vector normal : new Vector[] {
+                new Vector(1, 0, 0), new Vector(-1, 0, 0),
+                new Vector(0, 0, 1), new Vector(0, 0, -1)
+        }) {
+            Location anchor = DragonEscapeMovementKits.wallClingAnchor(contact, normal);
+            assertEquals(0.04D, anchor.getX() - contact.getX() == 0.0D
+                    ? Math.abs(anchor.getZ() - contact.getZ())
+                    : Math.abs(anchor.getX() - contact.getX()), 0.00001D);
+            assertEquals(contact.getY(), anchor.getY(), 0.00001D);
+            assertEquals(contact.getYaw(), anchor.getYaw(), 0.00001F);
+            assertEquals(contact.getPitch(), anchor.getPitch(), 0.00001F);
+        }
+        assertEquals(10.5D, contact.getX(), 0.00001D, "The contact location is not mutated");
+        assertEquals(-4.5D, contact.getZ(), 0.00001D);
+        assertEquals(contact, DragonEscapeMovementKits.wallClingAnchor(contact, null));
+        assertNull(DragonEscapeMovementKits.wallClingAnchor(null, new Vector(1, 0, 0)));
+    }
+
+    @Test
     void acrobatWallContactUsesTheLatchedHitboxAfterAttemptedMovement() {
         Location attempted = new Location(null, 23.0D, 75.0D, -10.0D);
         Location anchor = new Location(null, 22.5D, 74.75D, -11.5D);
