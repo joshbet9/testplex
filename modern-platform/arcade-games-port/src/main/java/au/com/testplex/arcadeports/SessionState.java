@@ -361,6 +361,10 @@ class SessionState {
     final Map<UUID, Integer> deathTagTurtleWindCharges = new HashMap<>();
     final Map<UUID, Long> deathTagTricksterSwapReadyAt = new HashMap<>();
     final Map<UUID, Long> deathTagTricksterFireworksReadyAt = new HashMap<>();
+    final Map<UUID, Long> deathTagTricksterWaterArmedUntil = new HashMap<>();
+    final Map<UUID, Long> deathTagTricksterWaterReadyAt = new HashMap<>();
+    final Map<UUID, Long> deathTagTricksterWebReadyAt = new HashMap<>();
+    final Map<Location, org.bukkit.block.data.BlockData> deathTagTricksterWebBlocks = new HashMap<>();
     final Map<UUID, String> deathTagRunnerTrailColours = new HashMap<>();
     final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
     final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();

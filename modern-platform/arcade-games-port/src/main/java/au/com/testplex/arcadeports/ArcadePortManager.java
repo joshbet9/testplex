@@ -8433,6 +8433,10 @@ public final class ArcadePortManager implements Listener {
                             "Chaser Swap", "Right-click to swap with a random grounded Chaser. 30-second cooldown."));
                     player.getInventory().addItem(namedItem(Material.FIREWORK_ROCKET,
                             "Runner Distraction", "Right-click to launch fireworks from every other living Runner. 30-second cooldown."));
+                    player.getInventory().addItem(namedItem(Material.WATER_BUCKET,
+                            "MLG Water Bucket", "Hold when landing to auto-clutch any fall, regardless of ping. Right-click to arm for 5s. 30s cooldown after a clutch."));
+                    player.getInventory().addItem(namedItem(Material.COBWEB,
+                            "Web Trap", "Right-click to drop a 3-second cobweb behind you. 25s cooldown."));
                 }
                 case "null" -> { /* Reborn's NullKit has no kit items. */ }
                 default -> player.getInventory().addItem(namedItem(Material.IRON_SWORD,
@@ -9312,6 +9316,67 @@ public final class ArcadePortManager implements Listener {
         runner.playSound(runner.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.15F);
         target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.85F);
         runner.sendMessage(ChatColor.LIGHT_PURPLE + "You swapped places with " + target.getName() + "!");
+    }
+
+
+    private boolean isDeathTagTricksterWaterBucket(ItemStack item) {
+        return item != null && item.getType() == Material.WATER_BUCKET && item.hasItemMeta()
+                && item.getItemMeta().hasDisplayName()
+                && "MLG Water Bucket".equals(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
+    }
+
+    private void armDeathTagTricksterWater(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
+        UUID id = runner.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTricksterWaterReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            runner.sendActionBar(ChatColor.RED + "Water Clutch recharges in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s");
+            return;
+        }
+        session.deathTagTricksterWaterArmedUntil.put(id,
+                now + DeathTagTricksterEscapeRules.WATER_ARM_WINDOW_MILLIS);
+        runner.sendActionBar(ChatColor.AQUA + "Water Clutch armed for 5s - land safely!");
+        runner.playSound(runner.getLocation(), Sound.ITEM_BUCKET_FILL, 0.5F, 1.2F);
+    }
+
+    private void useDeathTagTricksterWeb(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
+        UUID id = runner.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTricksterWebReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            runner.sendActionBar(ChatColor.RED + "Web Trap recharges in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s");
+            return;
+        }
+        org.bukkit.util.Vector backwards = runner.getLocation().getDirection();
+        backwards.setY(0.0D);
+        if (backwards.lengthSquared() < 0.001D) backwards.setZ(1.0D);
+        org.bukkit.block.Block webBlock = runner.getLocation().clone()
+                .add(backwards.normalize().multiply(-1.3D)).getBlock();
+        if (!DeathTagTricksterEscapeRules.canPlaceWeb(webBlock.getType().isAir(),
+                webBlock.getRelative(org.bukkit.block.BlockFace.DOWN).getType().isSolid())) {
+            runner.sendActionBar(ChatColor.YELLOW + "No safe ground behind you to place a Web Trap");
+            return;
+        }
+        Location placed = webBlock.getLocation();
+        if (session.deathTagTricksterWebBlocks.containsKey(placed)) return;
+        session.deathTagTricksterWebBlocks.put(placed, webBlock.getBlockData());
+        webBlock.setType(Material.COBWEB, false);
+        session.deathTagTricksterWebReadyAt.put(id, now + DeathTagTricksterEscapeRules.WEB_COOLDOWN_MILLIS);
+        runner.setCooldown(Material.COBWEB, (int) (DeathTagTricksterEscapeRules.WEB_COOLDOWN_MILLIS / 50L));
+        runner.playSound(runner.getLocation(), Sound.BLOCK_COBWEB_PLACE, 0.75F, 1.15F);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> restoreDeathTagTricksterWeb(session, placed),
+                DeathTagTricksterEscapeRules.WEB_DURATION_TICKS);
+    }
+
+    private void restoreDeathTagTricksterWeb(Session session, Location location) {
+        org.bukkit.block.data.BlockData oldData = session.deathTagTricksterWebBlocks.remove(location);
+        if (oldData == null || location.getWorld() == null) return;
+        org.bukkit.block.Block block = location.getBlock();
+        if (block.getType() == Material.COBWEB) block.setBlockData(oldData, false);
     }
 
     private void useDeathTagTricksterFireworks(Session session, Player runner) {
@@ -23215,6 +23280,11 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            for (Location location : new ArrayList<>(session.deathTagTricksterWebBlocks.keySet())) {
+                restoreDeathTagTricksterWeb(session, location);
+            }
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             restoreBaconDashFireBlocks(session);
             session.baconCrispyDashes.clear();
@@ -28714,6 +28784,36 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        // A Trickster holding the kit bucket receives a server-authoritative clutch on impact.
+        // The right-click packet need not arrive in the final fall tick (high-ping safe).
+        if (session.type == ArcadePortGame.DEATH_TAG && !event.isCancelled()
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && event.getEntity() instanceof Player runner
+                && session.alive.contains(runner.getUniqueId())
+                && !session.tagged.contains(runner.getUniqueId())
+                && "trickster".equals(session.deathTagRunnerKits.get(runner.getUniqueId()))
+                && event.getDamage() > 0.0D
+                && debugKitFeatureEnabled(runner, ArcadePortGame.DEATH_TAG, "trickster")) {
+            UUID id = runner.getUniqueId();
+            long now = System.currentTimeMillis();
+            if (DeathTagTricksterEscapeRules.shouldClutch(now,
+                    session.deathTagTricksterWaterReadyAt.getOrDefault(id, 0L),
+                    session.deathTagTricksterWaterArmedUntil.getOrDefault(id, 0L),
+                    isDeathTagTricksterWaterBucket(runner.getInventory().getItemInMainHand()))) {
+                event.setCancelled(true);
+                runner.setFallDistance(0.0F);
+                session.deathTagTricksterWaterArmedUntil.remove(id);
+                session.deathTagTricksterWaterReadyAt.put(id,
+                        now + DeathTagTricksterEscapeRules.WATER_COOLDOWN_MILLIS);
+                runner.setCooldown(Material.WATER_BUCKET,
+                        (int) (DeathTagTricksterEscapeRules.WATER_COOLDOWN_MILLIS / 50L));
+                runner.getWorld().spawnParticle(Particle.SPLASH, runner.getLocation(), 40,
+                        0.35D, 0.12D, 0.35D, 0.1D);
+                runner.playSound(runner.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 1.0F, 1.0F);
+                runner.sendActionBar(ChatColor.AQUA + "MLG Water Clutch!");
+                return;
+            }
+        }
         // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
         // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
         boolean gladiatorPlayerHit = false;
@@ -30626,6 +30726,16 @@ public final class ArcadePortManager implements Listener {
             if ("Runner Distraction".equals(ability)) {
                 event.setCancelled(true);
                 useDeathTagTricksterFireworks(session, player);
+                return;
+            }
+            if ("MLG Water Bucket".equals(ability) && item == Material.WATER_BUCKET) {
+                event.setCancelled(true);
+                armDeathTagTricksterWater(session, player);
+                return;
+            }
+            if ("Web Trap".equals(ability) && item == Material.COBWEB) {
+                event.setCancelled(true);
+                useDeathTagTricksterWeb(session, player);
                 return;
             }
         }
