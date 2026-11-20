@@ -15,6 +15,17 @@ final class BombLobbersPitcherTrajectory {
     private BombLobbersPitcherTrajectory() {
     }
 
+    static Vector selectTargetOffset(Vector directlyAimedOffset, Vector fallbackOffset) {
+        if (usableTargetOffset(directlyAimedOffset)) return directlyAimedOffset.clone();
+        return usableTargetOffset(fallbackOffset) ? fallbackOffset.clone() : null;
+    }
+
+    private static boolean usableTargetOffset(Vector offset) {
+        if (offset == null || !finite(offset)) return false;
+        double horizontalDistanceSquared = offset.getX() * offset.getX() + offset.getZ() * offset.getZ();
+        return horizontalDistanceSquared >= 4.0D && horizontalDistanceSquared <= 4096.0D;
+    }
+
     static Vector velocityToTarget(Vector horizontalDirection, Vector normalVelocity,
             double horizontalDistance, double verticalDelta) {
         if (horizontalDirection == null || normalVelocity == null

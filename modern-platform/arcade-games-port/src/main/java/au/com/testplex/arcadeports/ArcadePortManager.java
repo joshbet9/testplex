@@ -36278,6 +36278,19 @@ public final class ArcadePortManager implements Listener {
 
         Location opponentCentre = session.bombTeamSpawnCentres.get(opponentTeam);
         if (opponentCentre == null) return normalVelocity;
+        Location aimedSurface = bombLobbersPitcherAimedSurface(session, player, opponentTeam);
+        if (aimedSurface != null) {
+            Vector aimedOffset = BombLobbersPitcherTrajectory.selectTargetOffset(
+                    aimedSurface.toVector().subtract(origin.toVector()), null);
+            if (aimedOffset != null) {
+                Vector horizontal = aimedOffset.clone().setY(0.0D);
+                double distance = horizontal.length();
+                Vector corrected = BombLobbersPitcherTrajectory.velocityToTarget(
+                        horizontal, normalVelocity, distance, aimedOffset.getY());
+                if (corrected != null) return corrected;
+            }
+        }
+
         List<Location> surfaces = session.bombLobbersPitcherLandingSurfaces.computeIfAbsent(
                 opponentTeam, ignored -> scanBombLobbersPitcherLandingSurfaces(session, opponentTeam));
         if (surfaces.isEmpty()) return normalVelocity;
@@ -36311,6 +36324,23 @@ public final class ArcadePortManager implements Listener {
             }
         }
         return bestTarget == null ? normalVelocity : bestVelocity;
+    }
+
+    private Location bombLobbersPitcherAimedSurface(Session session, Player player, int team) {
+        Vector direction = player.getLocation().getDirection();
+        if (direction.lengthSquared() < 1.0E-8D) return null;
+        org.bukkit.util.RayTraceResult trace = session.world.rayTraceBlocks(
+                player.getEyeLocation(), direction.normalize(), 64.0D,
+                org.bukkit.FluidCollisionMode.NEVER, true);
+        if (trace == null || trace.getHitBlock() == null) return null;
+        Block hit = trace.getHitBlock();
+        if (nearestBombLobbersSpawnTeam(session, hit.getLocation()) != team) return null;
+
+        Block top = session.world.getHighestBlockAt(hit.getX(), hit.getZ());
+        if (!top.getType().isSolid() || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) return null;
+        Location surface = new Location(session.world,
+                top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
+        return nearestBombLobbersSpawnTeam(session, surface) == team ? surface : null;
     }
 
     private List<Location> scanBombLobbersPitcherLandingSurfaces(Session session, int team) {
