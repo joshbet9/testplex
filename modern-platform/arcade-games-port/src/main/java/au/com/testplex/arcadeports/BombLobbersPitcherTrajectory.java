@@ -15,6 +15,10 @@ final class BombLobbersPitcherTrajectory {
     private BombLobbersPitcherTrajectory() {
     }
 
+    static boolean isDestroyableBlock(boolean solid, float blastResistance) {
+        return solid && Float.isFinite(blastResistance) && blastResistance < 13.0F;
+    }
+
     static Vector selectTargetOffset(Vector directlyAimedOffset, Vector fallbackOffset) {
         if (usableTargetOffset(directlyAimedOffset)) return directlyAimedOffset.clone();
         return usableTargetOffset(fallbackOffset) ? fallbackOffset.clone() : null;

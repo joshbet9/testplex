@@ -4,6 +4,7 @@ import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,15 @@ class BombLobbersPitcherTrajectoryTest {
         assertEquals(20.0D, impact.getX(), 0.01D);
         assertEquals(1.0D, impact.getY(), 0.01D);
         assertEquals(0.0D, impact.getZ(), 0.01D);
+    }
+
+    @Test
+    void targetRayIncludesDestroyableBlocksAndSkipsExplosionProofBlocks() {
+        assertTrue(BombLobbersPitcherTrajectory.isDestroyableBlock(true, 6.0F));
+        assertTrue(BombLobbersPitcherTrajectory.isDestroyableBlock(true, 0.8F));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(false, 0.0F));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(true, Float.NaN));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(true, 1_200.0F));
     }
 
     @Test

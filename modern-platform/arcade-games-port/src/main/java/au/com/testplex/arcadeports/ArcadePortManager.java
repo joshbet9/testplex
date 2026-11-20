@@ -36457,7 +36457,7 @@ public final class ArcadePortManager implements Listener {
 
         Location opponentCentre = session.bombTeamSpawnCentres.get(opponentTeam);
         if (opponentCentre == null) return normalVelocity;
-        Location aimedSurface = bombLobbersPitcherAimedSurface(session, player, opponentTeam);
+        Location aimedSurface = bombLobbersPitcherAimedSurface(session, player);
         if (aimedSurface != null) {
             Vector aimedOffset = BombLobbersPitcherTrajectory.selectTargetOffset(
                     aimedSurface.toVector().subtract(origin.toVector()), null);
@@ -36505,32 +36505,37 @@ public final class ArcadePortManager implements Listener {
         return bestTarget == null ? normalVelocity : bestVelocity;
     }
 
-    private Location bombLobbersPitcherAimedSurface(Session session, Player player, int team) {
+    private Location bombLobbersPitcherAimedSurface(Session session, Player player) {
         Vector direction = player.getLocation().getDirection();
         if (direction.lengthSquared() < 1.0E-8D) return null;
         org.bukkit.util.RayTraceResult trace = session.world.rayTraceBlocks(
                 player.getEyeLocation(), direction.normalize(), 64.0D,
-                org.bukkit.FluidCollisionMode.NEVER, true);
+                org.bukkit.FluidCollisionMode.NEVER, true,
+                block -> BombLobbersPitcherTrajectory.isDestroyableBlock(block.getType().isSolid(), block.getType().getBlastResistance()));
         if (trace == null || trace.getHitBlock() == null) return null;
-        Block hit = trace.getHitBlock();
-        if (nearestBombLobbersSpawnTeam(session, hit.getLocation()) != team) return null;
 
-        Block top = session.world.getHighestBlockAt(hit.getX(), hit.getZ());
-        if (!top.getType().isSolid() || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) return null;
-        Location surface = new Location(session.world,
-                top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
-        return nearestBombLobbersSpawnTeam(session, surface) == team ? surface : null;
+        // Target the nearest TNT-destroyable block on the player's aim ray.
+        // Spawn-centre ownership and highest-column checks discard elevated or
+        // outer-edge pieces of authored islands.
+        Block target = trace.getHitBlock();
+        double topY = target.getBoundingBox().getMaxY();
+        Block feet = session.world.getBlockAt(target.getX(), (int) Math.floor(topY), target.getZ());
+        if (!feet.isPassable() || !feet.getRelative(0, 1, 0).isPassable()) return null;
+        return new Location(session.world, target.getX() + 0.5D, topY + 0.01D, target.getZ() + 0.5D);
     }
 
     private List<Location> scanBombLobbersPitcherLandingSurfaces(Session session, int team) {
         Location centre = session.bombTeamSpawnCentres.get(team);
         if (centre == null || centre.getWorld() != session.world) return List.of();
         List<Location> surfaces = new ArrayList<>();
-        int radius = 18;
+        int radius = 64;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                Block top = session.world.getHighestBlockAt(centre.getBlockX() + dx, centre.getBlockZ() + dz);
-                if (!top.getType().isSolid() || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
+                int x = centre.getBlockX() + dx;
+                int z = centre.getBlockZ() + dz;
+                if (!session.world.isChunkLoaded(x >> 4, z >> 4)) continue;
+                Block top = session.world.getHighestBlockAt(x, z);
+                if (!BombLobbersPitcherTrajectory.isDestroyableBlock(top.getType().isSolid(), top.getType().getBlastResistance()) || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
                 Location surface = new Location(session.world,
                         top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
                 if (nearestBombLobbersSpawnTeam(session, surface) == team) surfaces.add(surface);
