@@ -6,10 +6,14 @@ data, plugin configuration, statistics, achievements, profiles, and other
 persistent server state across machine replacements and deployments.
 
 The Fly image contains the seven Monster Maze source worlds from the same
-pinned repository revision used by Hyper-V. At startup, `/server` receives
-small symlinks to those image assets; the map files stay outside the persistent
-volume while Paper continues using `/server` as its world container. This
-preserves vanilla player data as well as plugin stats across deployments.
+pinned repository revision used by Hyper-V. At startup, the map provisioner
+copies these compact worlds into real directories under `/server`. Paper 26.3
+rejects symlink world roots while migrating older map data, so these directories
+must remain ordinary directories. Active game copies are disposable under
+`/tmp`; the persistent copy uses about 56 MiB and does not alter player,
+plugin, or stats data. Map provisioning validates the complete source set,
+checks available volume headroom, and replaces only map directories recorded by
+its revision marker.
 
 The Fly entrypoint checks `/proc/mounts` before writing anything and exits if
 the volume is missing. Keep that check and the `[[mounts]]` declaration in
