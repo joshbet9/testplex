@@ -6172,6 +6172,22 @@ public final class ArcadePortManager implements Listener {
     }
 
     private World createWorld(ArcadePortGame type, boolean allowSourceMap) {
+        if (type == ArcadePortGame.SNEAKY_ASSASSINS
+                && plugin.getConfig().getBoolean("sneaky-assassins.flat-test-map", false)) {
+            String testWorldName = "arcadeport_sneaky_assassins_flat_test";
+            World testWorld = Bukkit.getWorld(testWorldName);
+            if (testWorld == null) testWorld = new WorldCreator(testWorldName)
+                    .type(WorldType.FLAT).generateStructures(false).createWorld();
+            if (testWorld == null) throw new IllegalStateException("Could not load Sneaky Assassins flat test world.");
+            testWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+            testWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+            testWorld.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+            testWorld.setGameRule(GameRule.KEEP_INVENTORY, true);
+            testWorld.setSpawnLocation(0, 64, 0);
+            sourceMapWorlds.remove(type.id());
+            sourceMapData.put(type.id(), SourceMapCatalog.sneakyAssassinsFlatTestData(testWorld));
+            return testWorld;
+        }
         String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
         World world = allowSourceMap ? Bukkit.getWorld(sourceWorldName) : null;
         if (allowSourceMap && world == null && SourceMapCatalog.hasMap(type)) {
@@ -6331,7 +6347,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            sneakyAssassins.buildArena(world);
+            if (plugin.getConfig().getBoolean("sneaky-assassins.flat-test-map", false))
+                sneakyAssassins.buildFlatTestArena(world);
+            else sneakyAssassins.buildArena(world);
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
