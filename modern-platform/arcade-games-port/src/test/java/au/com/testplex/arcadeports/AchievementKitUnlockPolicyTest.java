@@ -27,7 +27,7 @@ class AchievementKitUnlockPolicyTest {
     }
 
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(26, AchievementKitUnlockPolicy.all().size());
+        assertEquals(27, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -62,7 +62,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(26, purple);
+        assertEquals(27, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
