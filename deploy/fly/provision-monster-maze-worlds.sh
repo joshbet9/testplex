@@ -68,22 +68,18 @@ trap cleanup EXIT
 # runtime copies under /tmp. Keep the data-volume footprint bounded and retain
 # headroom for Paper/plugin state while staging a complete replacement set.
 source_size_kb="$(du -sk -- "${WORLD_NAMES[@]/#/$SOURCE_ROOT/}" | awk '{ total += $1 } END { print total + 0 }')"
-existing_size_kb=0
-for world in "${WORLD_NAMES[@]}"; do
-    if [[ -d "$WORLD_ROOT/$world" && ! -L "$WORLD_ROOT/$world" ]]; then
-        size="$(du -sk -- "$WORLD_ROOT/$world" | awk '{ print $1 + 0 }')"
-        existing_size_kb=$((existing_size_kb + size))
-    fi
-done
+# df reports free space after accounting for the already-installed maps. Only
+# the new staged copy and the runtime reserve need to fit in that free space;
+# adding the existing map size again double-counts it and can prevent startup.
 available_kb="$(df -Pk -- "$WORLD_ROOT" | awk 'NR == 2 { print $4 + 0 }')"
 reserve_kb="${TESTPLEX_MM_VOLUME_RESERVE_KB:-32768}"
 if [[ ! "$reserve_kb" =~ ^[0-9]+$ ]]; then
     echo "Monster Maze map volume reserve must be a non-negative integer." >&2
     exit 1
 fi
-required_kb=$((source_size_kb + existing_size_kb + reserve_kb))
+required_kb=$((source_size_kb + reserve_kb))
 if (( available_kb < required_kb )); then
-    echo "Insufficient Fly volume space for safe Monster Maze map staging: available=${available_kb}KiB required=${required_kb}KiB (maps=${source_size_kb}KiB existing=${existing_size_kb}KiB reserve=${reserve_kb}KiB)." >&2
+    echo "Insufficient Fly volume space for safe Monster Maze map staging: available=${available_kb}KiB required=${required_kb}KiB (maps=${source_size_kb}KiB reserve=${reserve_kb}KiB)." >&2
     exit 1
 fi
 
@@ -145,3 +141,4 @@ printf '%s\n' "$EXPECTED_SOURCE" > "$stage/.testplex-mm-source-maps"
 mv -f -- "$stage/.testplex-mm-source-maps" "$WORLD_ROOT/.testplex-mm-source-maps"
 has_complete_world_set || { echo "Monster Maze source worlds failed post-install verification." >&2; exit 1; }
 echo "Copied and verified seven real Monster Maze source worlds at revision $EXPECTED_SOURCE; player world, plugin data, and statistics were preserved."
+
