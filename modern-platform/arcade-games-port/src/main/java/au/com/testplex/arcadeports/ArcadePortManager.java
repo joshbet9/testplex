@@ -36519,7 +36519,7 @@ public final class ArcadePortManager implements Listener {
         org.bukkit.util.RayTraceResult trace = session.world.rayTraceBlocks(
                 player.getEyeLocation(), direction.normalize(), 64.0D,
                 org.bukkit.FluidCollisionMode.NEVER, true,
-                block -> BombLobbersPitcherTrajectory.isDestroyableBlock(block.getType()));
+                block -> BombLobbersPitcherTrajectory.isDestroyableBlock(block.getType().isSolid(), block.getType().getBlastResistance()));
         if (trace == null || trace.getHitBlock() == null) return null;
 
         // Target the nearest TNT-destroyable block on the player's aim ray.
@@ -36543,7 +36543,7 @@ public final class ArcadePortManager implements Listener {
                 int z = centre.getBlockZ() + dz;
                 if (!session.world.isChunkLoaded(x >> 4, z >> 4)) continue;
                 Block top = session.world.getHighestBlockAt(x, z);
-                if (!BombLobbersPitcherTrajectory.isDestroyableBlock(top.getType()) || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
+                if (!BombLobbersPitcherTrajectory.isDestroyableBlock(top.getType().isSolid(), top.getType().getBlastResistance()) || top.isLiquid() || !top.getRelative(0, 1, 0).isPassable()) continue;
                 Location surface = new Location(session.world,
                         top.getX() + 0.5D, top.getY() + 1.0D, top.getZ() + 0.5D);
                 if (nearestBombLobbersSpawnTeam(session, surface) == team) surfaces.add(surface);
