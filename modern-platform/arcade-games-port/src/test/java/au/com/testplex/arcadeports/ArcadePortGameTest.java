@@ -1016,10 +1016,12 @@ class ArcadePortGameTest {
     @Test void bombLobbersDoubleJumpAppliesLegacyGroundBoostAfterVelocityCap() {
         assertEquals(50L, ArcadePortRules.BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS);
         assertEquals(1_050L, ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(1_000L));
-        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 1, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 0, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 2, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 1, 1_049L, 1_050L));
+        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("armorer", 1, 1_050L, 1_050L),
+                "The source timing window applies to non-Acrobat kits too");
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("armorer", 0, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("armorer", 2, 1_050L, 1_050L),
+                "A non-Acrobat kit must not chain an unlimited number of airborne jumps");
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("armorer", 1, 1_049L, 1_050L));
         assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 1, 1_050L, 1_050L));
         assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 2, 1_050L, 1_050L),
                 "Acrobat can complete the source triple jump but cannot chain powered jumps indefinitely");
@@ -1032,6 +1034,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, true, 1, 1_049L, 1_050L));
         assertFalse(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("acrobat"));
         assertTrue(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("jumper"));
+        assertTrue(ArcadePortRules.shouldResetBombLobbersFallDistance(1_100L, 1_200L));
+        assertFalse(ArcadePortRules.shouldResetBombLobbersFallDistance(0L, 0L));
+        assertFalse(ArcadePortRules.shouldResetBombLobbersFallDistance(1_201L, 1_200L),
+                "Normal fall distance accumulates again after the short post-launch reset window");
         var look = new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D);
         var airborne = ArcadePortRules.bombLobbersDoubleJumpVelocity(look, 1.2D, false);
         var grounded = ArcadePortRules.bombLobbersDoubleJumpVelocity(look, 1.2D, true);
@@ -1156,6 +1162,9 @@ class ArcadePortGameTest {
         assertEquals(2.25D, ArcadePortRules.bombLobbersPitchVelocity(3), 0.00001D);
         assertEquals(12_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L));
         assertEquals(0L, ArcadePortRules.bombLobbersFirstCraftReadyAt(-1L));
+        assertEquals(12_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L, "armorer"));
+        assertEquals(20_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L, "pitcher"),
+                "Pitcher's kit TNT must not be duplicated by the immediate first Craftman refill");
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L));
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_000L));
         assertEquals(7_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_001L));

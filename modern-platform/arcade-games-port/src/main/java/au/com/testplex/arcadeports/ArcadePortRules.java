@@ -2277,8 +2277,7 @@ public final class ArcadePortRules {
     /** Allows a second powered jump after the first, producing the source-style triple jump. */
     public static boolean canUseBombLobbersAirDoubleJump(
             String kit, int jumpsSinceGround, long nowMillis, long readyAtMillis) {
-        if (nowMillis < readyAtMillis) return false;
-        return jumpsSinceGround == 1;
+        return nowMillis >= readyAtMillis && jumpsSinceGround == 1;
     }
 
     /** A stale grounded sample after takeoff must not refund another jump. */
@@ -2350,9 +2349,26 @@ public final class ArcadePortRules {
         return (1.0D - Math.floor(1.0D / step) * step) / 2.0D;
     }
 
-    /** Source Recharge has no entry before first use, so first Craftman grant is immediately ready. */
+    /** Pitcher begins with a special throw, so its first generic Craftman TNT waits one refill interval. */
     public static long bombLobbersFirstCraftReadyAt(long nowMillis) {
         return Math.max(0L, nowMillis);
+    }
+
+    public static long bombLobbersFirstCraftReadyAt(long nowMillis, String kit) {
+        long firstReady = bombLobbersFirstCraftReadyAt(nowMillis);
+        if (!"pitcher".equals(normalizeBombLobbersKit(kit))) return firstReady;
+        long interval = bombLobbersCraftmanIntervalMillis(0L);
+        return firstReady > Long.MAX_VALUE - interval ? Long.MAX_VALUE : firstReady + interval;
+    }
+
+    /** Clears stale pre-launch fall accumulation for the first few physics ticks after a perk jump. */
+    public static long bombLobbersFallDistanceResetUntil(long nowMillis) {
+        long now = Math.max(0L, nowMillis);
+        return now > Long.MAX_VALUE - 200L ? Long.MAX_VALUE : now + 200L;
+    }
+
+    public static boolean shouldResetBombLobbersFallDistance(long nowMillis, long resetUntilMillis) {
+        return resetUntilMillis > 0L && nowMillis <= resetUntilMillis;
     }
 
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
