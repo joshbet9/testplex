@@ -222,11 +222,26 @@ final class DragonEscapeMovementKits {
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 
-    static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
+    static final double DISRUPTOR_MINE_BLAST_IMPULSE = 0.825D;
 
     /** Only the Disruptor's TNT ability item needs Adventure-mode block permission. */
     static boolean shouldEnableDisruptorAdventurePlacement(org.bukkit.Material material, String displayName) {
         return material == org.bukkit.Material.TNT && "Disruptor".equals(displayName);
+    }
+
+    static boolean hasDisruptorSupportClearance(boolean solidSupport, double feetY, double supportTopY) {
+        double clearance = feetY - supportTopY;
+        return solidSupport && Double.isFinite(clearance) && clearance >= -0.05D && clearance <= 0.18D;
+    }
+
+    /** Converts RTT into a bounded window for matching a delayed use to a recent support block. */
+    static long disruptorSupportHistoryMillis(int pingMillis) {
+        return Math.max(250L, Math.min(1_000L, Math.max(0, pingMillis) * 2L + 100L));
+    }
+
+    static boolean isRecentDisruptorSupport(long supportSeenAtMillis, long nowMillis, int pingMillis) {
+        long age = nowMillis - supportSeenAtMillis;
+        return age >= 0L && age <= disruptorSupportHistoryMillis(pingMillis);
     }
 
     /** Only a top-face click on the block directly under the racer is a self-launch use. */
