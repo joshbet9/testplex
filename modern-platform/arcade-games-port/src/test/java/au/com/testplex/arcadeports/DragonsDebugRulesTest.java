@@ -164,6 +164,14 @@ class DragonsDebugRulesTest {
     }
 
     @Test
+    void dragonsAcquireRacersImmediatelyUnlessAnAttractedSparklerHasPriority() {
+        assertTrue(ArcadePortRules.dragonsShouldAcquireRacer(1, false));
+        assertTrue(ArcadePortRules.dragonsShouldAcquireRacer(8, false));
+        assertFalse(ArcadePortRules.dragonsShouldAcquireRacer(0, false));
+        assertFalse(ArcadePortRules.dragonsShouldAcquireRacer(3, true));
+    }
+
+    @Test
     void exposedDragonMechanicsHaveBoundedProfileControls() {
         assertVariable("DRAGONS_MAX_DRAGONS", 0.0D, 64.0D);
         assertVariable("DRAGONS_DODGEMS_QUIET_MILLIS", 0.0D, 120_000.0D);
