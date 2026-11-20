@@ -723,6 +723,8 @@ class SessionState {
     final Map<UUID, Long> dragonLastContactAt = new HashMap<>();
     final Map<UUID, UUID> dragonSparklerOwners = new HashMap<>();
     final Map<UUID, UUID> dragonSparklerDragonOwners = new HashMap<>();
+    final Map<UUID, UUID> dragonSparklerMarkerByItem = new HashMap<>();
+    final Map<UUID, UUID> dragonSparklerTargetByDragon = new HashMap<>();
     final Map<UUID, UUID> dragonRecentSparklerHitOwner = new HashMap<>();
     final Map<UUID, Long> dragonRecentSparklerHitAt = new HashMap<>();
     final Map<UUID, UUID> dragonRecentTamerHitOwner = new HashMap<>();
