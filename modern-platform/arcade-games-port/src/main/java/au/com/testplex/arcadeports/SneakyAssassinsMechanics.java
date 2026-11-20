@@ -363,9 +363,11 @@ final class SneakyAssassinsMechanics {
         this.powerUpLocations = resolvePowerUpLocations(world, mapData);
         this.configuredNpcSpawns = mapData == null ? List.of() : mapData.dataLocations("YELLOW").stream()
                 .filter(location -> location.getWorld() == world).map(Location::clone).toList();
-        // Remove legacy persistent villagers left behind by earlier test rounds.
-        // Only the dedicated test world gets an unrestricted NPC cleanup.
-        if (world != null && "arcadeport_source_sneaky_assassins".equals(world.getName())) {
+        // Only the selected synthetic map permits clearing persistent test NPCs.
+        // Authentic Sneaky Assassins maps share the same world slot but may contain
+        // authored villagers that must never be removed by this cleanup.
+        if (world != null && mapData != null
+                && "Sneaky Assassins 100x100 Test".equals(mapData.mapName())) {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof Villager) entity.remove();
             }
