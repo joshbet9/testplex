@@ -9,6 +9,14 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
+    void disruptorAdventurePredicateAllowsEveryMapSurface() {
+        var predicate = DragonEscapeMovementKits.disruptorAdventurePlacementPredicate();
+        assertEquals(1, predicate.predicates().size());
+        assertNull(predicate.predicates().get(0).blocks(),
+                "An empty block predicate keeps TNT use available on all map surfaces in Adventure mode");
+    }
+
+    @Test
     void featherBounceBeginsWithFiveChargesAndRejectsGroundClicks() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         assertEquals(5, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);

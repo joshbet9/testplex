@@ -10184,7 +10184,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if ("disruptor".equals(kit)) {
                     setDragonEscapeKitBlockCharges(player, Material.TNT, "Disruptor",
-                            "Step onto your armed mine from the side you want to launch toward. Opponents still trigger it when they step on it.", 1);
+                            "Right-click the block beneath you for an immediate vertical launch. Elsewhere triggers opponents after a short arming delay.", 1);
                 } else if ("builder".equals(kit)) {
                     int startingBricks = Math.max(0, GameDebugRuntimeOverrides.intValue(
                             "DRAGON_ESCAPE_BUILDER_MAX_BRICKS", ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS));
@@ -13898,6 +13898,10 @@ public final class ArcadePortManager implements Listener {
 
     private ItemStack namedItem(Material type, String title, String lore, int amount) {
         ItemStack item = new ItemStack(type, amount);
+        if (type == Material.TNT && "Disruptor".equals(title)) {
+            item.setData(io.papermc.paper.datacomponent.DataComponentTypes.CAN_PLACE_ON,
+                    DragonEscapeMovementKits.disruptorAdventurePlacementPredicate());
+        }
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(ChatColor.GOLD + title);
@@ -18363,7 +18367,7 @@ public final class ArcadePortManager implements Listener {
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.TNT) < maxTnt) {
                         rechargeDragonEscapeKitBlock(player, Material.TNT, "Disruptor",
-                                "Step onto your armed mine from the side you want to launch toward. Opponents still trigger it when they step on it.", maxTnt);
+                                "Right-click the block beneath you for an immediate vertical launch. Elsewhere triggers opponents after a short arming delay.", maxTnt);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextTntAt.put(id, now + interval);
