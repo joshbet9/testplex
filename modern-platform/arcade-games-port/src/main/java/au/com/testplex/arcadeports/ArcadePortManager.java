@@ -17008,6 +17008,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonFlightVectors.remove(id);
                 session.dragonLastBlockDamageLocation.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
+                session.dragonSparklerTargetByDragon.remove(id);
                 it.remove();
             }
         }
@@ -17051,14 +17052,20 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 UUID dragonId = dragon.getUniqueId();
-                // MineplexDragon begins on a map-relative sky waypoint. Once it reaches
-                // that waypoint above the spectator height, its source state machine
-                // switches to a living racer and the dragon charges at them.
-                Location initialSkyTarget = randomDragonSkyTarget(session);
-                session.dragonTargetLocations.put(dragonId, initialSkyTarget);
-                dragon.setTarget(null);
-                dragon.setPodium(initialSkyTarget);
-                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
+                // Acquire a racer immediately. The old altitude gate could strand the
+                // dragon in FLY_TO_PORTAL on a custom map indefinitely.
+                Player initialTarget = possibleTargets.isEmpty() ? null
+                        : possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size()));
+                if (initialTarget != null) {
+                    session.dragonTargetPlayers.put(dragonId, initialTarget.getUniqueId());
+                    session.dragonTargetLocations.put(dragonId, initialTarget.getLocation().clone());
+                } else {
+                    Location initialSkyTarget = randomDragonSkyTarget(session);
+                    session.dragonTargetLocations.put(dragonId, initialSkyTarget);
+                    dragon.setPodium(initialSkyTarget);
+                }
+                dragon.setTarget(initialTarget);
+                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(initialTarget != null));
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -17139,22 +17146,31 @@ public final class ArcadePortManager implements Listener {
                         session.dragonTargetLocations.put(dragonId, target.clone());
                     } else {
                         session.dragonTargetPlayers.remove(dragonId);
+                        targetPlayerId = null;
                         target = null;
                     }
                 }
 
-                // MineplexDragon.updateTarget() runs on FASTEST: if below Y=10, target sky;
-                // otherwise only select a new target within six blocks of the current one.
+                UUID sparklerMarkerId = session.dragonSparklerTargetByDragon.get(dragonId);
+                Entity sparklerMarker = sparklerMarkerId == null ? null : session.world.getEntity(sparklerMarkerId);
+                if (sparklerMarker == null || !sparklerMarker.isValid()) {
+                    session.dragonSparklerTargetByDragon.remove(dragonId);
+                    sparklerMarker = null;
+                } else {
+                    target = sparklerMarker.getLocation().clone();
+                    session.dragonTargetLocations.put(dragonId, target.clone());
+                }
+
+                // Do not wait for a custom-height waypoint: Paper's portal phase does not
+                // treat the saved map coordinates as a destination.
                 double targetDistanceSquared = target == null ? Double.POSITIVE_INFINITY
                         : dragon.getLocation().distanceSquared(target);
-                if (ArcadePortRules.shouldRetargetDragon(
-                        dragon.getLocation().getY(), targetDistanceSquared, target != null)) {
+                boolean needsRacerTarget = ArcadePortRules.dragonsShouldAcquireRacer(
+                        possibleTargets.size(), sparklerMarker != null) && targetPlayerId == null;
+                if (sparklerMarker == null && (needsRacerTarget || ArcadePortRules.shouldRetargetDragon(
+                        dragon.getLocation().getY(), targetDistanceSquared, target != null))) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
-                    double spectatorY = session.dragonSpectatorLocation == null
-                            ? session.world.getSpawnLocation().getY()
-                            : session.dragonSpectatorLocation.getY();
-                    if (ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(
-                            dragon.getLocation().getY(), spectatorY, possibleTargets.size())) {
+                    if (!possibleTargets.isEmpty()) {
                         Player newTarget = possibleTargets.get(
                                 ThreadLocalRandom.current().nextInt(possibleTargets.size()));
                         session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
@@ -17177,15 +17193,20 @@ public final class ArcadePortManager implements Listener {
                 dragon.setAI(true);
                 Player selectedPlayer = session.dragonTargetPlayers.containsKey(dragonId)
                         ? session.players.get(session.dragonTargetPlayers.get(dragonId)) : null;
+                UUID selectedMarkerId = session.dragonSparklerTargetByDragon.get(dragonId);
+                Entity selectedMarker = selectedMarkerId == null ? null : session.world.getEntity(selectedMarkerId);
                 if (selectedPlayer != null && selectedPlayer.isOnline()
                         && session.alive.contains(selectedPlayer.getUniqueId())) {
-                    // Reborn's setTargetEntity path maps to the native strafing
-                    // phase against the living player selected by the source logic.
                     dragon.setTarget(selectedPlayer);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    if (dragon.getPhase() != phase) {
-                        dragon.setPhase(phase);
-                    }
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
+                } else if (selectedMarker instanceof org.bukkit.entity.LivingEntity livingMarker
+                        && selectedMarker.isValid()) {
+                    // Follow the exact Sparkler position through a non-visible marker
+                    // using native AI; no dragon steering or AI shutdown is involved.
+                    dragon.setTarget(livingMarker);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                 } else {
                     dragon.setTarget(null);
                     Location waypoint = session.dragonTargetLocations.get(dragonId);
@@ -17258,6 +17279,17 @@ public final class ArcadePortManager implements Listener {
                 session.dragonSparklerStyles.remove(sparklerId);
                 session.dragonSparklerOwners.remove(sparklerId);
                 session.dragonSparklerLanded.remove(sparklerId);
+                UUID markerId = session.dragonSparklerMarkerByItem.remove(sparklerId);
+                if (markerId != null) {
+                    session.dragonSparklerTargetByDragon.entrySet().removeIf(e -> markerId.equals(e.getValue()));
+                    for (Iterator<Entity> markerIt = session.entities.iterator(); markerIt.hasNext();) {
+                        Entity tracked = markerIt.next();
+                        if (markerId.equals(tracked.getUniqueId())) {
+                            tracked.remove();
+                            markerIt.remove();
+                        }
+                    }
+                }
                 it.remove();
                 item.remove();
                 continue;
@@ -17272,15 +17304,36 @@ public final class ArcadePortManager implements Listener {
             // itself remains until PerkSparkler's >100 tick cleanup.
             if (!ArcadePortRules.shouldDragonSparklerAttract(
                     itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
+            UUID markerId = session.dragonSparklerMarkerByItem.get(sparklerId);
+            Entity existingMarker = markerId == null ? null : session.world.getEntity(markerId);
+            org.bukkit.entity.ArmorStand marker;
+            if (existingMarker instanceof org.bukkit.entity.ArmorStand stand && stand.isValid()) {
+                marker = stand;
+                marker.teleport(itemLocation);
+            } else {
+                marker = session.world.spawn(itemLocation, org.bukkit.entity.ArmorStand.class, stand -> {
+                    stand.setMarker(true);
+                    stand.setInvisible(true);
+                    stand.setInvulnerable(true);
+                    stand.setSilent(true);
+                    stand.setGravity(false);
+                    stand.setCollidable(false);
+                    stand.setPersistent(false);
+                    stand.setAI(false);
+                });
+                markerId = marker.getUniqueId();
+                session.dragonSparklerMarkerByItem.put(sparklerId, markerId);
+                session.entities.add(marker);
+            }
             for (EnderDragon dragon : dragons) {
                 if (dragon.getLocation().distanceSquared(itemLocation)
                         > GameDebugRuntimeOverrides.doubleValue("DRAGONS_SPARKLER_RANGE_SQUARED", ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED)) continue;
-                session.dragonTargetPlayers.remove(dragon.getUniqueId());
-                session.dragonTargetLocations.put(dragon.getUniqueId(), itemLocation.clone());
+                UUID dragonId = dragon.getUniqueId();
+                session.dragonTargetPlayers.remove(dragonId);
+                session.dragonSparklerTargetByDragon.put(dragonId, markerId);
+                session.dragonTargetLocations.put(dragonId, itemLocation.clone());
                 UUID sparklerOwner = session.dragonSparklerOwners.get(sparklerId);
-                if (sparklerOwner != null) {
-                    session.dragonSparklerDragonOwners.put(dragon.getUniqueId(), sparklerOwner);
-                }
+                if (sparklerOwner != null) session.dragonSparklerDragonOwners.put(dragonId, sparklerOwner);
             }
         }
 
@@ -29731,19 +29784,32 @@ public final class ArcadePortManager implements Listener {
     public void onDragonsEntityTarget(EntityTargetEvent event) {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DRAGONS
-                && event.getEntity().getWorld() == session.world) {
-            boolean selectedLivingPlayer = false;
-            if (event.getEntity() instanceof EnderDragon dragon
-                    && event.getTarget() instanceof Player target) {
-                selectedLivingPlayer = ArcadePortRules.shouldAllowDragonEntityTarget(
-                        target.getUniqueId(), session.dragonTargetPlayers.get(dragon.getUniqueId()),
-                        session.alive.contains(target.getUniqueId()),
-                        session.dragonTamerByDragon.containsKey(dragon.getUniqueId()));
-            }
-            // The controller sets this target explicitly every pursuit update. Cancelling
-            // all EntityTargetEvents also cancelled our own setTarget() call, leaving every
-            // dragon in the source-map sky targets and never diving at a racer.
-            if (!selectedLivingPlayer) event.setCancelled(true);
+                && event.getEntity().getWorld() == session.world
+                && event.getEntity() instanceof EnderDragon dragon && event.getTarget() != null) {
+            Entity requested = event.getTarget();
+            UUID dragonId = dragon.getUniqueId();
+            boolean selectedPlayer = requested instanceof Player target
+                    && ArcadePortRules.shouldAllowDragonEntityTarget(target.getUniqueId(),
+                            session.dragonTargetPlayers.get(dragonId), session.alive.contains(target.getUniqueId()),
+                            session.dragonTamerByDragon.containsKey(dragonId));
+            boolean selectedSparkler = requested instanceof org.bukkit.entity.ArmorStand
+                    && requested.getUniqueId().equals(session.dragonSparklerTargetByDragon.get(dragonId));
+            if (!selectedPlayer && !selectedSparkler) event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDragonsEntityCollision(io.papermc.paper.event.entity.EntityCollideWithEntityEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGONS) return;
+        List<Entity> involved = event.getEntities();
+        if (involved.size() != 2) return;
+        Entity first = involved.get(0);
+        Entity second = involved.get(1);
+        if (first instanceof EnderDragon && second instanceof EnderDragon
+                && ArcadePortRules.shouldCancelDragonsEntityCollision(true,
+                        session.entities.contains(first), session.entities.contains(second))) {
+            event.setCancelled(true);
         }
     }
 

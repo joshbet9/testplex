@@ -1774,16 +1774,20 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
-    /** Source player targets charge at racers; block waypoints use native flight. */
-    public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasPlayerTarget) {
-        return hasPlayerTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.FLY_TO_PORTAL;
+    /** Use native charging flight for selected racer and Sparkler marker targets. */
+    public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasEntityTarget) {
+        return hasEntityTarget ? EnderDragon.Phase.CHARGE_PLAYER : EnderDragon.Phase.FLY_TO_PORTAL;
     }
 
-    /** MineplexDragon starts on a sky waypoint, then chooses a racer after reaching it above the spectator height. */
-    public static boolean dragonsShouldTargetPlayerAfterWaypoint(
-            double dragonY, double spectatorY, int eligibleTargetCount) {
-        return eligibleTargetCount > 0 && Double.isFinite(dragonY) && Double.isFinite(spectatorY)
-                && dragonY > spectatorY;
+    /** Select racers immediately unless a nearby Sparkler has priority. */
+    public static boolean dragonsShouldAcquireRacer(int eligibleTargetCount, boolean hasSparklerTarget) {
+        return eligibleTargetCount > 0 && !hasSparklerTarget;
+    }
+
+    /** Cancel pushes only between tracked dragons in the active Dragons match. */
+    public static boolean shouldCancelDragonsEntityCollision(
+            boolean dragonsGame, boolean firstTrackedDragon, boolean secondTrackedDragon) {
+        return dragonsGame && firstTrackedDragon && secondTrackedDragon;
     }
 
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
