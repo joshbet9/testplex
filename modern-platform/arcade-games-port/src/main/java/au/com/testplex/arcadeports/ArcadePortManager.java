@@ -6807,7 +6807,8 @@ public final class ArcadePortManager implements Listener {
     private void openGladiatorVoteMenu(Player player) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
+                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
+                || session.gladiatorVotes.containsKey(player.getUniqueId())) return;
         openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote",
                 session.gladiatorVoteOptions);
     }
@@ -7246,14 +7247,10 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorVoteOptions = gladiatorLobbyVoteOptions.isEmpty()
                 ? GladiatorsVoteOptions.randomOptions() : List.copyOf(gladiatorLobbyVoteOptions);
         gladiatorLobbyVoteOptions = List.of();
+        // A new tournament starts a fresh mandatory ballot for every participant.
+        // Lobby preferences can determine options, but must never skip the spawn vote.
         session.gladiatorVotes.clear();
-        for (UUID id : session.players.keySet()) {
-            String vote = gladiatorLobbyVotes.remove(id);
-            GladiatorsMode mode = GladiatorsMode.fromId(vote);
-            if (mode != null && session.gladiatorVoteOptions.contains(mode)) {
-                session.gladiatorVotes.put(id, vote);
-            }
-        }
+        for (UUID id : session.players.keySet()) gladiatorLobbyVotes.remove(id);
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingStartedAt = System.currentTimeMillis();
         session.gladiatorVotingEndsAt = session.gladiatorVotingStartedAt + ArcadePortRules.gladiatorsVoteMillis();
@@ -7275,9 +7272,7 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             player.setGameMode(GameMode.ADVENTURE);
             giveGladiatorVoteItem(player);
-            if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
-                player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
-            }
+            player.sendMessage(ChatColor.YELLOW + "Choose a ruleset to unlock the voting menu.");
             // Opening immediately after closeInventory can be lost by the client/server
             // inventory transition. Reopen on the next tick so the ballot is visible
             // from the first vote tick, including for players with a prior lobby menu.
@@ -7382,6 +7377,15 @@ public final class ArcadePortManager implements Listener {
                 || !session.players.containsKey(player.getUniqueId())
                 || !session.gladiatorVoteOptions.contains(mode)) return;
         session.gladiatorVotes.put(player.getUniqueId(), mode.id());
+        // The ballot is final for this player: retire its book and stop forcing the GUI.
+        player.getInventory().setItem(8, null);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline() && active == session
+                    && player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
+                    && holder.type == GladiatorMenuType.VOTE && !holder.lobbyVote) {
+                player.closeInventory();
+            }
+        });
         player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
         long onlineVoters = session.players.values().stream()
                 .filter(candidate -> candidate != null && candidate.isOnline()).count();
@@ -7939,6 +7943,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) {
                 player.sendActionBar("");
+                player.getInventory().setItem(8, null);
                 if (player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
                         && holder.type == GladiatorMenuType.VOTE) player.closeInventory();
             }
@@ -8366,6 +8371,18 @@ public final class ArcadePortManager implements Listener {
         updateGladiatorSpectators(session);
         updateGladiatorArenaAdvances(session, now);
         if (session.gladiatorVotingEndsAt > 0L) {
+            // Enforce the voting inventory for all still-unvoted players, even
+            // when another listener or a client closes/replaces their GUI.
+            if (now < session.gladiatorVotingEndsAt && session.ticks % 5L == 0L) {
+                for (Player voter : session.players.values()) {
+                    if (voter == null || !voter.isOnline()
+                            || session.gladiatorVotes.containsKey(voter.getUniqueId())) continue;
+                    if (!(voter.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder)
+                            || holder.type != GladiatorMenuType.VOTE || holder.lobbyVote) {
+                        openGladiatorVoteMenu(voter);
+                    }
+                }
+            }
             long onlineVoters = session.players.values().stream()
                     .filter(player -> player != null && player.isOnline()).count();
             if (session.gladiatorVotes.size() >= onlineVoters
@@ -34822,11 +34839,13 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         long now = System.currentTimeMillis();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || session.gladiatorVotes.containsKey(player.getUniqueId())
                 || !ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
                         session.players.containsKey(player.getUniqueId()), session.gladiatorVotingEndsAt, now)) return;
         Bukkit.getScheduler().runTask(plugin, () -> {
             Session current = active;
             if (player.isOnline() && current == session
+                    && !current.gladiatorVotes.containsKey(player.getUniqueId())
                     && ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
                             current.players.containsKey(player.getUniqueId()),
                             current.gladiatorVotingEndsAt, System.currentTimeMillis())) {
