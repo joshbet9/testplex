@@ -1,6 +1,5 @@
 package au.com.testplex.arcadeports;
 
-import org.bukkit.Material;
 import org.bukkit.util.Vector;
 
 /**
@@ -16,10 +15,8 @@ final class BombLobbersPitcherTrajectory {
     private BombLobbersPitcherTrajectory() {
     }
 
-    static boolean isDestroyableBlock(Material material) {
-        // Four-power TNT can break blocks only below roughly this resistance.
-        return material != null && material.isBlock() && material.isSolid()
-                && material.getBlastResistance() < 13.0F;
+    static boolean isDestroyableBlock(boolean solid, float blastResistance) {
+        return solid && Float.isFinite(blastResistance) && blastResistance < 13.0F;
     }
 
     static Vector selectTargetOffset(Vector directlyAimedOffset, Vector fallbackOffset) {
