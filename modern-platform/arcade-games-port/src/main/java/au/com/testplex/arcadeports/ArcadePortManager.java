@@ -24096,7 +24096,6 @@ public final class ArcadePortManager implements Listener {
         session.bombPowerTypes.clear();
         session.bombPowerupDrops.clear();
         session.bombPowerupTeamByDrop.clear();
-        session.bombPowerupStatusByTeam.clear();
         session.bombLastThrowAt.clear();
         session.bombLastWallerAt.clear();
         session.bombConstructorModes.clear();
@@ -34787,7 +34786,6 @@ public final class ArcadePortManager implements Listener {
             }
             session.bombPowerupDrops.clear();
             session.bombPowerupTeamByDrop.clear();
-            session.bombPowerupStatusByTeam.clear();
             session.bombNextPowerupSpawnAtByTeam.clear();
             return;
         }
@@ -34804,14 +34802,16 @@ public final class ArcadePortManager implements Listener {
                 0, ignored -> now + nextBombLobbersPowerupDelayMillis());
         if (now < nextWaveAt) return;
 
+        Location redSpawn = findBombLobbersPowerupSpawn(session, 0);
+        Location blueSpawn = findBombLobbersPowerupSpawn(session, 1);
+        if (!ArcadePortRules.canSpawnPairedBombLobbersPowerupWave(redSpawn != null, blueSpawn != null)) {
+            scheduleBombLobbersPowerupRetry(session, now);
+            return;
+        }
+
         String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost"};
-        int spawned = 0;
         for (int team = 0; team < 2; team++) {
-            BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
-            if (status == BombLobbersPowerupStatus.SPAWNED
-                    || status == BombLobbersPowerupStatus.OBTAINED) continue;
-            Location spawn = findBombLobbersPowerupSpawn(session, team);
-            if (spawn == null) continue;
+            Location spawn = team == 0 ? redSpawn : blueSpawn;
             String powerup = choices[ThreadLocalRandom.current().nextInt(choices.length)];
             ItemStack powerupStack = createBombLobbersPowerupStack(powerup);
             ItemMeta powerupMeta = powerupStack.getItemMeta();
@@ -34831,22 +34831,28 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(drop);
             session.bombPowerupDrops.put(drop.getUniqueId(), drop);
             session.bombPowerupTeamByDrop.put(drop.getUniqueId(), team);
-            session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.SPAWNED);
             session.world.spawnParticle(Particle.HAPPY_VILLAGER, spawn.clone().add(0.0D, 0.5D, 0.0D),
                     28, 0.55D, 0.65D, 0.55D, 0.04D);
             session.world.spawnParticle(Particle.END_ROD, spawn.clone().add(0.0D, 0.6D, 0.0D),
                     8, 0.25D, 0.35D, 0.25D, 0.02D);
             session.world.playSound(spawn, Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F, 1.6F);
-            spawned++;
         }
-        // Both sides share one unpredictable wave clock, not two frequent announcements.
+        // Both teams get one drop per wave, while earlier uncollected drops remain in play.
+        // The types are selected independently so a paired wave need not match.
+        scheduleBombLobbersPowerupWave(session, now + nextBombLobbersPowerupDelayMillis());
+        updateBombLobbersScoreboard(session);
+    }
+
+    private void scheduleBombLobbersPowerupRetry(Session session, long now) {
         long retryDelay = Math.max(1L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS",
                 ArcadePortRules.BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS));
-        long nextWave = now + (spawned == 0 ? retryDelay : nextBombLobbersPowerupDelayMillis());
+        scheduleBombLobbersPowerupWave(session, now + retryDelay);
+    }
+
+    private void scheduleBombLobbersPowerupWave(Session session, long nextWave) {
         for (int team = 0; team < 2; team++) {
             session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
         }
-        if (spawned > 0) updateBombLobbersScoreboard(session);
     }
 
     private Location findBombLobbersPowerupSpawn(Session session, int requestedTeam) {
@@ -34939,10 +34945,6 @@ public final class ArcadePortManager implements Listener {
 
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.9F, 1.35F);
         Item drop = event.getItem();
-        Integer powerupTeam = session.bombPowerupTeamByDrop.get(drop.getUniqueId());
-        if (powerupTeam != null) {
-            session.bombPowerupStatusByTeam.put(powerupTeam, BombLobbersPowerupStatus.OBTAINED);
-        }
         player.sendActionBar(ChatColor.GREEN + ChatColor.BOLD.toString()
                 + ArcadePortRules.bombLobbersPowerupObtainedLabel());
         Bukkit.getScheduler().runTask(plugin, () -> {
@@ -34959,7 +34961,6 @@ public final class ArcadePortManager implements Listener {
         if (session == null || player == null || powerupItem == null) return;
         Integer team = bombLobbersPowerupTeam(powerupItem);
         String type = bombLobbersPowerupType(powerupItem);
-        if (team != null) session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.ACTIVATED);
         String message = ArcadePortRules.bombLobbersPowerupActivationMessage(
                 player.getName(), team == null ? -1 : team, type);
         if (!message.isEmpty()) {
@@ -36655,7 +36656,6 @@ public final class ArcadePortManager implements Listener {
     private record DragonTamerControl(UUID dragonId, Location returnLocation, GameMode previousGameMode, long endsAtMillis) { }
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
-    private enum BombLobbersPowerupStatus { SPAWNED, OBTAINED, ACTIVATED }
 
     private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
     private record MicroPlacedBlockOwner(UUID ownerId, long placedAtMillis) { }
@@ -36812,7 +36812,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, BaconCrispyDashState> baconCrispyDashes = new HashMap<>();
         final Map<Block, BaconDashFireState> baconDashFireBlocks = new HashMap<>();
         final Map<BaconHitPair, Long> baconLastHitAtByPair = new HashMap<>();
-        final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
         final Map<Integer, List<Location>> bombLobbersPitcherLandingSurfaces = new HashMap<>();
         final Map<UUID, TurfWarsInfiltration> turfInfiltration = new HashMap<>();
         final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
