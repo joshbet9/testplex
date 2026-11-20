@@ -7244,14 +7244,10 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorVoteOptions = gladiatorLobbyVoteOptions.isEmpty()
                 ? GladiatorsVoteOptions.randomOptions() : List.copyOf(gladiatorLobbyVoteOptions);
         gladiatorLobbyVoteOptions = List.of();
+        // A new tournament starts a fresh mandatory ballot for every participant.
+        // Lobby preferences can determine options, but must never skip the spawn vote.
         session.gladiatorVotes.clear();
-        for (UUID id : session.players.keySet()) {
-            String vote = gladiatorLobbyVotes.remove(id);
-            GladiatorsMode mode = GladiatorsMode.fromId(vote);
-            if (mode != null && session.gladiatorVoteOptions.contains(mode)) {
-                session.gladiatorVotes.put(id, vote);
-            }
-        }
+        for (UUID id : session.players.keySet()) gladiatorLobbyVotes.remove(id);
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingStartedAt = System.currentTimeMillis();
         session.gladiatorVotingEndsAt = session.gladiatorVotingStartedAt + ArcadePortRules.gladiatorsVoteMillis();
@@ -7272,10 +7268,8 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.getInventory().clear();
             player.setGameMode(GameMode.ADVENTURE);
-            if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
-                giveGladiatorVoteItem(player);
-                player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
-            }
+            giveGladiatorVoteItem(player);
+            player.sendMessage(ChatColor.YELLOW + "Choose a ruleset to unlock the voting menu.");
             // Opening immediately after closeInventory can be lost by the client/server
             // inventory transition. Reopen on the next tick so the ballot is visible
             // from the first vote tick, including for players with a prior lobby menu.
@@ -7946,6 +7940,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) {
                 player.sendActionBar("");
+                player.getInventory().setItem(8, null);
                 if (player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
                         && holder.type == GladiatorMenuType.VOTE) player.closeInventory();
             }
@@ -8373,6 +8368,18 @@ public final class ArcadePortManager implements Listener {
         updateGladiatorSpectators(session);
         updateGladiatorArenaAdvances(session, now);
         if (session.gladiatorVotingEndsAt > 0L) {
+            // Enforce the voting inventory for all still-unvoted players, even
+            // when another listener or a client closes/replaces their GUI.
+            if (now < session.gladiatorVotingEndsAt && session.ticks % 5L == 0L) {
+                for (Player voter : session.players.values()) {
+                    if (voter == null || !voter.isOnline()
+                            || session.gladiatorVotes.containsKey(voter.getUniqueId())) continue;
+                    if (!(voter.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder)
+                            || holder.type != GladiatorMenuType.VOTE || holder.lobbyVote) {
+                        openGladiatorVoteMenu(voter);
+                    }
+                }
+            }
             long onlineVoters = session.players.values().stream()
                     .filter(player -> player != null && player.isOnline()).count();
             if (session.gladiatorVotes.size() >= onlineVoters
