@@ -1,6 +1,5 @@
 package au.com.testplex.arcadeports;
 
-import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,9 +13,8 @@ class DeathTagKitsRulesTest {
     }
 
     @Test void waterAndWebOnlyOverwriteAir() {
-        assertTrue(DeathTagTricksterMechanics.canPlaceUtilityBlock(Material.AIR));
-        assertFalse(DeathTagTricksterMechanics.canPlaceUtilityBlock(Material.STONE));
-        assertFalse(DeathTagTricksterMechanics.canPlaceUtilityBlock(Material.WATER));
+        assertTrue(DeathTagTricksterMechanics.canPlaceUtilityBlock(true));
+        assertFalse(DeathTagTricksterMechanics.canPlaceUtilityBlock(false));
         assertEquals(100L, DeathTagTricksterMechanics.WATER_DURATION_TICKS);
         assertEquals(160L, DeathTagTricksterMechanics.WEB_DURATION_TICKS);
         assertEquals(200L, DeathTagTricksterMechanics.DECOY_DURATION_TICKS);
