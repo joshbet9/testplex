@@ -5423,6 +5423,9 @@ public final class ArcadePortManager implements Listener {
                 && selectedMapData != null && selectedMapData.inferredMetadata();
         if (inferredMasterBuildersMap || !sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
+        if (type == ArcadePortGame.DRAGONS) {
+            session.dragonMapResource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGONS);
+        }
         session.dragonEscapePractice = practiceMode && type == ArcadePortGame.DRAGON_ESCAPE;
         session.dragonEscapePracticeDouglas = session.dragonEscapePractice && plugin.getConfig().getBoolean(
                 "dragon-escape-practice.douglas." + requester.getUniqueId(), false);
@@ -16822,26 +16825,14 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 UUID dragonId = dragon.getUniqueId();
-                boolean hasInitialTargets = ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(
-                        possibleTargets.size());
-                Player initialTarget = hasInitialTargets
-                        ? possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size())) : null;
-                if (initialTarget != null) {
-                    // Start each new dragon on a living racer. Starting with a random
-                    // sky waypoint meant the native flight brain could circle above
-                    // the course indefinitely without ever reaching a player target.
-                    session.dragonTargetPlayers.put(dragonId, initialTarget.getUniqueId());
-                    Location playerTarget = initialTarget.getLocation().clone();
-                    session.dragonTargetLocations.put(dragonId, playerTarget);
-                    dragon.setTarget(initialTarget);
-                    dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(true));
-                } else {
-                    Location initialSkyTarget = randomDragonSkyTarget(session);
-                    session.dragonTargetLocations.put(dragonId, initialSkyTarget);
-                    // With no eligible racers, keep the source-style native waypoint flight.
-                    dragon.setPodium(initialSkyTarget);
-                    dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
-                }
+                // MineplexDragon begins on a map-relative sky waypoint. Once it reaches
+                // that waypoint above the spectator height, its source state machine
+                // switches to a living racer and the dragon charges at them.
+                Location initialSkyTarget = randomDragonSkyTarget(session);
+                session.dragonTargetLocations.put(dragonId, initialSkyTarget);
+                dragon.setTarget(null);
+                dragon.setPodium(initialSkyTarget);
+                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -16933,7 +16924,11 @@ public final class ArcadePortManager implements Listener {
                 if (ArcadePortRules.shouldRetargetDragon(
                         dragon.getLocation().getY(), targetDistanceSquared, target != null)) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
-                    if (!possibleTargets.isEmpty()) {
+                    double spectatorY = session.dragonSpectatorLocation == null
+                            ? session.world.getSpawnLocation().getY()
+                            : session.dragonSpectatorLocation.getY();
+                    if (ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(
+                            dragon.getLocation().getY(), spectatorY, possibleTargets.size())) {
                         Player newTarget = possibleTargets.get(
                                 ThreadLocalRandom.current().nextInt(possibleTargets.size()));
                         session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
@@ -21024,6 +21019,22 @@ public final class ArcadePortManager implements Listener {
                     ArcadePortRules.isBaconArenaKnockoutReason(reason));
             killer = resolvedKillerId == null ? null : session.players.get(resolvedKillerId);
         }
+        if (session.type == ArcadePortGame.DRAGONS && killer == null) {
+            UUID victimId = player.getUniqueId();
+            UUID creditedOwner = DragonsAchievementRules.resolveDragonFallKiller(
+                    victimId, null,
+                    session.dragonRecentSparklerHitOwner.get(victimId),
+                    session.dragonRecentSparklerHitAt.getOrDefault(victimId, 0L),
+                    session.dragonRecentTamerHitOwner.get(victimId),
+                    session.dragonRecentTamerHitAt.getOrDefault(victimId, 0L),
+                    System.currentTimeMillis(), reason);
+            Player owner = creditedOwner == null ? null : session.players.get(creditedOwner);
+            if (owner != null) {
+                killer = owner;
+                session.lastHitKillerByVictim.put(victimId, creditedOwner);
+                session.lastHitModeByVictim.put(victimId, "Dragon");
+            }
+        }
         UUID disruptorOwnerId = null;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             UUID victimId = player.getUniqueId();
@@ -24885,15 +24896,21 @@ public final class ArcadePortManager implements Listener {
     private void awardDragonSurvivalGems(Session session, UUID playerId, long outAt) {
         if (session.type != ArcadePortGame.DRAGONS || playerId == null || testPlayers.isTestPlayer(playerId)
                 || !session.dragonSurvivalGemsPaid.add(playerId)) return;
-        double amount = ArcadePortRules.dragonSurvivalGems(Math.max(0L, outAt - session.startedAt));
-        if (amount <= 0.0D) return;
-        String path = localStatsPath(playerId, "dragons");
-        plugin.getConfig().set(path + "survival-millis",
-                plugin.getConfig().getLong(path + "survival-millis", 0L)
-                        + Math.max(0L, outAt - session.startedAt));
-        plugin.getConfig().set(path + "survival-gems",
-                plugin.getConfig().getDouble(path + "survival-gems", 0.0D) + amount);
-        plugin.saveConfig();
+        long survivalMillis = Math.max(0L, outAt - session.startedAt);
+        long roundSurvivalMillis = session.dragonRoundStartedAt > 0L
+                ? Math.max(0L, outAt - session.dragonRoundStartedAt) : 0L;
+        String kit = session.dragonKits.getOrDefault(playerId, "coward");
+        boolean improvedRecord = DragonsSurvivalRecords.update(plugin.getConfig(), playerId,
+                session.dragonMapResource, kit, roundSurvivalMillis);
+        double amount = ArcadePortRules.dragonSurvivalGems(survivalMillis);
+        if (amount > 0.0D) {
+            String path = localStatsPath(playerId, "dragons");
+            plugin.getConfig().set(path + "survival-millis",
+                    plugin.getConfig().getLong(path + "survival-millis", 0L) + survivalMillis);
+            plugin.getConfig().set(path + "survival-gems",
+                    plugin.getConfig().getDouble(path + "survival-gems", 0.0D) + amount);
+        }
+        if (amount > 0.0D || improvedRecord) plugin.saveConfig();
     }
 
     private void awardDragonTestGems(UUID playerId, double amount) {
@@ -25399,7 +25416,8 @@ public final class ArcadePortManager implements Listener {
 
     private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, MILESTONES, KIT_LEVELS, DRAGON_ESCAPE_MAPS,
         DRAGON_ESCAPE_KITS,
-        DRAGON_ESCAPE_COLOURS, MONSTER_MAZE_PBS, MONSTER_MAZE_KITS, MONSTER_MAZE_LEADERBOARD }
+        DRAGON_ESCAPE_COLOURS, DRAGONS_MAPS, DRAGONS_KITS, DRAGONS_LEADERBOARD,
+        MONSTER_MAZE_PBS, MONSTER_MAZE_KITS, MONSTER_MAZE_LEADERBOARD }
 
     private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
@@ -26851,13 +26869,17 @@ public final class ArcadePortManager implements Listener {
         if (current != StatsPage.MILESTONES && !statsMilestones(gameId).isEmpty())
             tabs.add(new Tab(Material.REDSTONE_LAMP, "Milestones", "View lifetime milestone tracks and tiers.",
                     "open-game-milestones"));
-        boolean hasPbs = "dragon-escape".equals(gameId) || "monster-maze".equals(gameId);
+        boolean hasPbs = "dragon-escape".equals(gameId) || "dragons".equals(gameId)
+                || "monster-maze".equals(gameId);
         boolean inPbs = current == StatsPage.DRAGON_ESCAPE_MAPS || current == StatsPage.DRAGON_ESCAPE_KITS
+                || current == StatsPage.DRAGONS_MAPS || current == StatsPage.DRAGONS_KITS
+                || current == StatsPage.DRAGONS_LEADERBOARD
                 || current == StatsPage.MONSTER_MAZE_PBS || current == StatsPage.MONSTER_MAZE_KITS
                 || current == StatsPage.MONSTER_MAZE_LEADERBOARD;
         if (hasPbs && !inPbs)
             tabs.add(new Tab(Material.CLOCK, "Personal Bests", "View map/pattern personal bests.",
-                    "dragon-escape".equals(gameId) ? "open-dragon-escape-pbs" : "open-maze-pbs"));
+                    "dragon-escape".equals(gameId) ? "open-dragon-escape-pbs"
+                            : "dragons".equals(gameId) ? "open-dragons-pbs" : "open-maze-pbs"));
         if (current != StatsPage.KIT_LEVELS)
             tabs.add(new Tab(Material.BLAZE_POWDER, "Kit Levels", "View XP earned using each kit.",
                     "open-game-kit-levels"));
@@ -27312,6 +27334,174 @@ public final class ArcadePortManager implements Listener {
     private void openDragonEscapePersonalBests(Player viewer, UUID targetId, String targetName,
                                                int returnAchievementPage) {
         openDragonEscapePersonalBests(viewer, targetId, targetName, returnAchievementPage, false);
+    }
+
+    private List<String> dragonsSurvivalKitIds() {
+        return ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGONS, List.of()).stream()
+                .map(kit -> kit.id).toList();
+    }
+
+    private long dragonsSurvivalPersonalBest(UUID playerId, String mapResource, String kitId) {
+        return DragonsSurvivalRecords.get(plugin.getConfig(), playerId, mapResource, kitId);
+    }
+
+    private List<UUID> dragonsSurvivalPbRecordedPlayers() {
+        var root = plugin.getConfig().getConfigurationSection("dragons-survival-pb");
+        if (root == null) return List.of();
+        List<UUID> players = new ArrayList<>();
+        for (String key : root.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                if (!testPlayers.isTestPlayer(id)) players.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        return players;
+    }
+
+    private List<DragonsSurvivalRecords.RankedRun> dragonsSurvivalRanking(String mapResource, String kitId) {
+        List<DragonsSurvivalRecords.Run> runs = new ArrayList<>();
+        for (UUID playerId : dragonsSurvivalPbRecordedPlayers()) {
+            long time = dragonsSurvivalPersonalBest(playerId, mapResource, kitId);
+            if (time > 0L) runs.add(new DragonsSurvivalRecords.Run(playerId, time));
+        }
+        return DragonsSurvivalRecords.rank(runs);
+    }
+
+    private ArcadeStatsPlacement.Result dragonsSurvivalPlacement(UUID playerId, String mapResource, String kitId) {
+        long best = dragonsSurvivalPersonalBest(playerId, mapResource, kitId);
+        if (best <= 0L) return null;
+        List<Long> times = dragonsSurvivalRanking(mapResource, kitId).stream()
+                .map(DragonsSurvivalRecords.RankedRun::elapsedMillis).toList();
+        return ArcadeStatsPlacement.higherIsBetter(best, times);
+    }
+
+    private void openDragonsSurvivalBests(Player viewer, UUID targetId, String targetName, int requestedPage) {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGONS);
+        int page = ArcadeStatsLayout.clampPage(requestedPage, maps.size(), ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE);
+        Inventory inventory = createStatsInventory(StatsPage.DRAGONS_MAPS, targetId, targetName,
+                "Dragons Survival Records", "dragons", 0, false, page, 0);
+        int start = page * ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE;
+        boolean placements = showStatsPlacementDetails(viewer, "dragons");
+        for (int i = start; i < Math.min(maps.size(), start + ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE); i++) {
+            SourceMapCatalog.MapArchive map = maps.get(i);
+            long best = -1L;
+            String bestKit = null;
+            for (String kit : dragonsSurvivalKitIds()) {
+                long candidate = dragonsSurvivalPersonalBest(targetId, map.resource(), kit);
+                if (candidate > best) { best = candidate; bestKit = kit; }
+            }
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.YELLOW + "Best survival: " + ChatColor.WHITE
+                    + (best > 0L ? ArcadePortRules.formatDragonsSurvivalTime(best) : "No record yet"));
+            if (bestKit != null) lore.add(ChatColor.GRAY + "Kit: " + ChatColor.WHITE + kitDisplayName(ArcadePortGame.DRAGONS, bestKit));
+            if (placements) lore.add(ChatColor.DARK_GRAY + "Placements are shown per kit.");
+            lore.add(" ");
+            lore.add(ChatColor.AQUA + "Click: View each kit and its leaderboard");
+            inventory.setItem(9 + i - start, statsItem(Material.PAPER, ChatColor.BOLD + map.displayName(), lore,
+                    "toggle-placement-details", map.resource(), "dragons"));
+        }
+        if (maps.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER, ChatColor.RED + "No Maps Installed",
+                List.of(ChatColor.GRAY + "No Dragons map archives were found."), "noop", null, null));
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "Go Back", List.of(),
+                "back-arcade", null, null));
+        inventory.setItem(4, statsItem(placements ? Material.LIME_DYE : Material.GRAY_DYE,
+                ChatColor.AQUA + "Placements: " + (placements ? "Shown" : "Hidden"),
+                List.of(ChatColor.GRAY + "Shift-left-click to " + (placements ? "hide" : "show")
+                        + " per-kit placements."), "toggle-dragons-pb-placement", null, "dragons"));
+        if (page > 0) inventory.setItem(ArcadeStatsLayout.PREVIOUS,
+                statsItem(Material.ARROW, ChatColor.YELLOW + "Previous Page", List.of(),
+                        "open-dragons-pb-page", Integer.toString(page - 1), "dragons"));
+        if (start + ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE < maps.size())
+            inventory.setItem(ArcadeStatsLayout.NEXT, statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page", List.of(),
+                    "open-dragons-pb-page", Integer.toString(page + 1), "dragons"));
+        addStatsTabFooter(inventory, "dragons", StatsPage.DRAGONS_MAPS);
+        viewer.openInventory(inventory);
+    }
+
+    private void openDragonsSurvivalKits(Player viewer, UUID targetId, String targetName, String mapResource) {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGONS);
+        int mapIndex = -1;
+        SourceMapCatalog.MapArchive selected = null;
+        for (int i = 0; i < maps.size(); i++) if (maps.get(i).resource().equals(mapResource)) {
+            mapIndex = i; selected = maps.get(i); break;
+        }
+        if (selected == null) return;
+        boolean placements = showStatsPlacementDetails(viewer, "dragons");
+        Inventory inventory = createStatsInventory(StatsPage.DRAGONS_KITS, targetId, targetName,
+                selected.displayName() + " Survival by Kit", mapResource, 0, false, mapIndex, 0);
+        List<String> kits = dragonsSurvivalKitIds();
+        List<Integer> slots = ArcadeStatsLayout.columns(kits.size());
+        for (int index = 0; index < kits.size(); index++) {
+            String kit = kits.get(index);
+            long best = dragonsSurvivalPersonalBest(targetId, mapResource, kit);
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
+                    + (best > 0L ? ArcadePortRules.formatDragonsSurvivalTime(best) : "No record yet"));
+            if (placements) lore.add(ChatColor.YELLOW + "Placement: "
+                    + statsPlacementLabel(dragonsSurvivalPlacement(targetId, mapResource, kit)));
+            lore.add(" ");
+            lore.add(ChatColor.AQUA + "Click: View survival leaderboard");
+            inventory.setItem(18 + slots.get(index), statsItem(ArcadeLobbyKitCatalogue.forGame(
+                            ArcadePortGame.DRAGONS, List.of()).get(index).icon,
+                    ChatColor.AQUA + kitDisplayName(ArcadePortGame.DRAGONS, kit), lore,
+                    "open-dragons-pb-leaderboard", kit, "dragons"));
+        }
+        inventory.setItem(4, statsItem(placements ? Material.LIME_DYE : Material.GRAY_DYE,
+                ChatColor.AQUA + "Placements: " + (placements ? "Shown" : "Hidden"),
+                List.of(ChatColor.GRAY + "Shift-left-click to " + (placements ? "hide" : "show")
+                        + " Testplex placements."), "toggle-dragons-kit-placement", mapResource, "dragons"));
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "Go Back", List.of(),
+                "back-dragons-pb-maps", Integer.toString(mapIndex), "dragons"));
+        addStatsTabFooter(inventory, "dragons", StatsPage.DRAGONS_KITS);
+        viewer.openInventory(inventory);
+    }
+
+    private void openDragonsSurvivalLeaderboard(Player viewer, UUID targetId, String targetName,
+            String mapResource, String kitId, int requestedPage) {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGONS);
+        String mapName = maps.stream().filter(map -> map.resource().equals(mapResource))
+                .map(SourceMapCatalog.MapArchive::displayName).findFirst().orElse("Unknown map");
+        List<DragonsSurvivalRecords.RankedRun> ranked = dragonsSurvivalRanking(mapResource, kitId);
+        int pages = Math.max(1, (ranked.size() + 35) / 36);
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inventory = createStatsInventory(StatsPage.DRAGONS_LEADERBOARD, targetId, targetName,
+                "Dragons Survival Rankings", "dragons", page, false,
+                maps.indexOf(maps.stream().filter(map -> map.resource().equals(mapResource)).findFirst().orElse(null)),
+                dragonsSurvivalKitIds().indexOf(kitId));
+        int start = page * 36;
+        for (int i = start; i < Math.min(ranked.size(), start + 36); i++) {
+            DragonsSurvivalRecords.RankedRun run = ranked.get(i);
+            String name = Bukkit.getOfflinePlayer(run.playerId()).getName();
+            if (name == null || name.isBlank()) name = "Player " + run.playerId().toString().substring(0, 8);
+            boolean own = run.playerId().equals(viewer.getUniqueId());
+            ItemStack head = statsItem(Material.PLAYER_HEAD,
+                    (own ? ChatColor.GREEN : ChatColor.GOLD) + "#" + run.rank() + " " + name,
+                    List.of(ChatColor.YELLOW + "Survived: " + ChatColor.WHITE
+                                    + ArcadePortRules.formatDragonsSurvivalTime(run.elapsedMillis()),
+                            own ? ChatColor.GREEN + "Your record" : ChatColor.GRAY + "Personal best"),
+                    "noop", null, null);
+            if (head.getItemMeta() instanceof SkullMeta skull) {
+                skull.setOwningPlayer(Bukkit.getOfflinePlayer(run.playerId()));
+                head.setItemMeta(skull);
+            }
+            inventory.setItem(9 + i - start, head);
+        }
+        inventory.setItem(0, statsItem(Material.RED_BED, ChatColor.GRAY + "Go Back", List.of(),
+                "back-dragons-pb-kits", mapResource, "dragons"));
+        inventory.setItem(4, statsItem(Material.CLOCK, ChatColor.GOLD + mapName + " — "
+                        + kitDisplayName(ArcadePortGame.DRAGONS, kitId),
+                List.of(ChatColor.GRAY + "Longest survival ranks first.",
+                        ChatColor.GRAY + "Recorded players: " + ranked.size()), "noop", null, null));
+        if (ranked.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
+                ChatColor.YELLOW + "No records yet", List.of(ChatColor.GRAY + "Play this map with this kit to set a record."),
+                "noop", null, null));
+        if (page > 0) inventory.setItem(45, statsItem(Material.ARROW, ChatColor.YELLOW + "Previous Page", List.of(),
+                "page-dragons-pb-leaderboard", Integer.toString(page - 1), "dragons"));
+        if (page + 1 < pages) inventory.setItem(53, statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page", List.of(),
+                "page-dragons-pb-leaderboard", Integer.toString(page + 1), "dragons"));
+        viewer.openInventory(inventory);
     }
 
     private void openDragonEscapePersonalBests(Player viewer, UUID targetId, String targetName,
@@ -34400,6 +34590,52 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "open-dragons-pbs" -> openDragonsSurvivalBests(player, holder.targetId,
+                        holder.targetName, 0);
+                case "open-dragons-pb-page" -> {
+                    int page = 0;
+                    try { page = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    openDragonsSurvivalBests(player, holder.targetId, holder.targetName, page);
+                }
+                case "toggle-dragons-pb-placement" -> {
+                    if (!event.isShiftClick() || !event.isLeftClick()) return;
+                    toggleStatsPlacementDetails(player, "dragons");
+                    openDragonsSurvivalBests(player, holder.targetId, holder.targetName, holder.menuPage);
+                }
+                case "open-dragons-pb-kits" -> {
+                    if (category != null) openDragonsSurvivalKits(player, holder.targetId,
+                            holder.targetName, category);
+                }
+                case "toggle-dragons-kit-placement" -> {
+                    if (!event.isShiftClick() || !event.isLeftClick() || category == null) return;
+                    toggleStatsPlacementDetails(player, "dragons");
+                    openDragonsSurvivalKits(player, holder.targetId, holder.targetName, category);
+                }
+                case "open-dragons-pb-leaderboard" -> {
+                    if (category != null) openDragonsSurvivalLeaderboard(player, holder.targetId,
+                            holder.targetName, holder.categoryId, category, 0);
+                }
+                case "back-dragons-pb-maps" -> {
+                    int mapIndex = 0;
+                    try { mapIndex = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    openDragonsSurvivalBests(player, holder.targetId, holder.targetName,
+                            Math.max(0, mapIndex / ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE));
+                }
+                case "back-dragons-pb-kits" -> openDragonsSurvivalKits(player, holder.targetId,
+                        holder.targetName, category);
+                case "page-dragons-pb-leaderboard" -> {
+                    List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGONS);
+                    List<String> kits = dragonsSurvivalKitIds();
+                    if (holder.menuPage < 0 || holder.menuPage >= maps.size()
+                            || holder.dragonPbView < 0 || holder.dragonPbView >= kits.size()) return;
+                    int page = 0;
+                    try { page = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    openDragonsSurvivalLeaderboard(player, holder.targetId, holder.targetName,
+                            maps.get(holder.menuPage).resource(), kits.get(holder.dragonPbView), page);
+                }
                 case "toggle-placement-details" -> {
                     if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS && category != null) {
                         if (event.isShiftClick() && event.isLeftClick()) {
@@ -34411,6 +34647,15 @@ public final class ArcadePortManager implements Listener {
                             openDragonEscapeKitBests(player, holder.targetId, holder.targetName,
                                     category, holder.achievementPage, holder.incompleteOnly,
                                     holder.dragonPbView);
+                        }
+                        return;
+                    }
+                    if (holder.page == StatsPage.DRAGONS_MAPS) {
+                        if (event.isShiftClick() && event.isLeftClick()) {
+                            toggleStatsPlacementDetails(player, "dragons");
+                            openDragonsSurvivalBests(player, holder.targetId, holder.targetName, holder.menuPage);
+                        } else if (category != null) {
+                            openDragonsSurvivalKits(player, holder.targetId, holder.targetName, category);
                         }
                         return;
                     }

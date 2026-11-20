@@ -27,6 +27,39 @@ final class DragonsAchievementRules {
     }
 
     /**
+     * Attributes a fall/void elimination to the most recent valid player-owned dragon contact.
+     * Direct combat attribution takes precedence, and stale/self hits never become kills.
+     */
+    static UUID resolveDragonFallKiller(UUID victimId, UUID directKillerId,
+            UUID sparklerOwnerId, long sparklerHitAt, UUID tamerOwnerId, long tamerHitAt,
+            long now, String reason) {
+        if (directKillerId != null) return directKillerId.equals(victimId) ? null : directKillerId;
+        if (!isFallOrVoid(reason)) return null;
+        UUID mostRecentOwner = null;
+        long mostRecentAt = 0L;
+        if (isRecentDragonHit(victimId, sparklerOwnerId, sparklerHitAt, now)) {
+            mostRecentOwner = sparklerOwnerId;
+            mostRecentAt = sparklerHitAt;
+        }
+        if (isRecentDragonHit(victimId, tamerOwnerId, tamerHitAt, now)
+                && (mostRecentOwner == null || tamerHitAt > mostRecentAt)) {
+            mostRecentOwner = tamerOwnerId;
+        }
+        return mostRecentOwner;
+    }
+
+    private static boolean isRecentDragonHit(UUID victimId, UUID ownerId, long hitAt, long now) {
+        return ownerId != null && !ownerId.equals(victimId) && hitAt > 0L
+                && now >= hitAt && now - hitAt <= 10_000L;
+    }
+
+    private static boolean isFallOrVoid(String reason) {
+        if (reason == null) return false;
+        String normalized = reason.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("fell") || normalized.contains("void");
+    }
+
+    /**
      * Forecasts the next three seconds of a falling player's vertical path.
      * A floor sample is the top Y of a solid block under the player's predicted
      * position for that tick, or NaN when the column is open. The forecast uses

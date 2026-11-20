@@ -150,10 +150,13 @@ class DragonsDebugRulesTest {
     }
 
     @Test
-    void newlySpawnedDragonsPreferLivingRacersAndUseSkyWaypointsOnlyWithoutTargets() {
-        assertFalse(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(0));
-        assertTrue(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(1));
-        assertTrue(ArcadePortRules.shouldAssignDragonPlayerTargetOnSpawn(3));
+    void dragonsFollowSourceSkyWaypointThenChargeLivingRacers() {
+        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(70.0D, 70.0D, 1));
+        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(69.9D, 70.0D, 3));
+        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(80.0D, 70.0D, 0));
+        assertFalse(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(Double.NaN, 70.0D, 1));
+        assertTrue(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(70.1D, 70.0D, 1));
+        assertTrue(ArcadePortRules.dragonsShouldTargetPlayerAfterWaypoint(80.0D, 70.0D, 3));
         assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
         assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
     }

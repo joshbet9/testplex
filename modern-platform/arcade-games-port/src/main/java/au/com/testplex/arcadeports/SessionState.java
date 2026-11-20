@@ -726,6 +726,7 @@ class SessionState {
     final Map<UUID, Long> dragonRecentTamerHitAt = new HashMap<>();
     final Map<UUID, String> dragonSparklerStyles = new HashMap<>();
     long dragonRoundStartedAt;
+    String dragonMapResource;
     final Set<UUID> dragonSurvivalGemsPaid = new HashSet<>();
     final List<UUID> dragonEliminationOrder = new ArrayList<>();
     boolean dragonEndGemsPaid;

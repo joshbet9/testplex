@@ -1774,14 +1774,16 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
-    /** Source player targets use the dragon's strafe phase; source block waypoints use native flight. */
+    /** Source player targets charge at racers; block waypoints use native flight. */
     public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasPlayerTarget) {
         return hasPlayerTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.FLY_TO_PORTAL;
     }
 
-    /** Newly spawned Dragons should pursue an eligible racer instead of starting on a sky waypoint. */
-    public static boolean shouldAssignDragonPlayerTargetOnSpawn(int eligibleTargetCount) {
-        return eligibleTargetCount > 0;
+    /** MineplexDragon starts on a sky waypoint, then chooses a racer after reaching it above the spectator height. */
+    public static boolean dragonsShouldTargetPlayerAfterWaypoint(
+            double dragonY, double spectatorY, int eligibleTargetCount) {
+        return eligibleTargetCount > 0 && Double.isFinite(dragonY) && Double.isFinite(spectatorY)
+                && dragonY > spectatorY;
     }
 
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
