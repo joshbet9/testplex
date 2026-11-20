@@ -1970,6 +1970,7 @@ public final class ArcadePortRules {
             case "acrobat", "jumper" -> "acrobat";
             case "armorer", "armourer" -> "armorer";
             case "constructor", "waller" -> "constructor";
+            case "pitcher" -> "pitcher";
             default -> null;
         };
     }
@@ -2026,7 +2027,8 @@ public final class ArcadePortRules {
     /** Acrobat and Constructor inherit TeamArmorModule's team-coloured leather set. */
     public static boolean bombLobbersKitUsesTeamArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
-        return "acrobat".equals(normalized) || "constructor".equals(normalized);
+        return "acrobat".equals(normalized) || "constructor".equals(normalized)
+                || "pitcher".equals(normalized);
     }
 
     /** Reborn's two Bomb Lobbers sides use red and aqua team colours for their trails/gear. */

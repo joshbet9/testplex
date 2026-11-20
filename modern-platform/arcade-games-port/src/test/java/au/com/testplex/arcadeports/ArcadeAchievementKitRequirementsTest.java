@@ -48,5 +48,9 @@ class ArcadeAchievementKitRequirementsTest {
                 ArcadeAchievementKitRequirements.kitIdsForAchievement("micro-battles", "speedster"));
         assertEquals(java.util.List.of("runnerkit-switcher"),
                 ArcadeAchievementKitRequirements.kitIdsForAchievement("runner", "nsfm"));
+        assertEquals(java.util.List.of("pitcher"),
+                ArcadeAchievementKitRequirements.kitIdsForAchievement("bomb-lobbers", "two-birds-one-stone"));
+        assertEquals(java.util.List.of("two-birds-one-stone"),
+                ArcadeAchievementKitRequirements.find("bomb-lobbers", "pitcher").achievementIds());
     }
 }

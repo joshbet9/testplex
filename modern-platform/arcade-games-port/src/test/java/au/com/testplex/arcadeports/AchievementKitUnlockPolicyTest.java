@@ -27,7 +27,7 @@ class AchievementKitUnlockPolicyTest {
     }
 
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(26, AchievementKitUnlockPolicy.all().size());
+        assertEquals(27, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -62,7 +62,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(26, purple);
+        assertEquals(27, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
@@ -72,6 +72,11 @@ class AchievementKitUnlockPolicyTest {
         assertFalse(constructor.requirements().contains("not-on-my-watch"));
         assertFalse(constructor.unlocked(Set.of("blast-proof", "jelly-skin")::contains));
         assertTrue(constructor.unlocked(Set.copyOf(constructor.requirements())::contains));
+
+        var pitcher = AchievementKitUnlockPolicy.find(ArcadePortGame.BOMB_LOBBERS, "pitcher");
+        assertEquals(java.util.List.of("two-birds-one-stone"), pitcher.requirements());
+        assertFalse(pitcher.requirements().contains("pitcher"));
+        assertTrue(pitcher.unlocked(Set.of("two-birds-one-stone")::contains));
         AchievementKitUnlockPolicy.Rule digger = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "digger");
         Set<String> earned = new HashSet<>(Set.of("to-hell-and-back"));
         assertEquals(java.util.List.of("skylands-master", "plundered"), digger.missing(earned::contains));
