@@ -58,7 +58,11 @@ final class DeathTagTricksterMechanics {
     private boolean closed;
 
     static boolean canPlaceUtilityBlock(Material type) {
-        return type.isAir();
+        return canPlaceUtilityBlock(type.isAir());
+    }
+
+    static boolean canPlaceUtilityBlock(boolean isAir) {
+        return isAir;
     }
 
     static boolean armedClutch(long now, long armedUntil, long readyAt) {
