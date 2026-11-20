@@ -368,8 +368,17 @@ public final class SourceMapCatalog {
     }
 
     /** Return the selected map resource, preserving an existing legacy selection on upgrade. */
+    public static final String SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE = "testplex:sneaky-assassins/flat-100x100";
+
+    public static boolean isSneakyAssassinsFlatTest(ArcadePortGame game, String resource) {
+        return game == ArcadePortGame.SNEAKY_ASSASSINS
+                && SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE.equals(resource);
+    }
+
     public static String selectedResource(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return null;
+        if (isSneakyAssassinsFlatTest(game, plugin.getConfig().getString("selected-maps." + game.id())))
+            return SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE;
         String configured = plugin.getConfig().getString("selected-maps." + game.id());
         String legacy = resourceFor(game);
         String legacyName = displayName(plugin, legacy);
@@ -421,6 +430,7 @@ public final class SourceMapCatalog {
         // not selected ZIP archives. Validate its actual active world instead
         // of rejecting Fly's packaged worlds through the generic archive path.
         if (game.isMonsterMaze()) return isInstalledMonsterMazeWorld(plugin);
+        if (isSneakyAssassinsFlatTest(game, resource)) return true;
         return resourcePathBelongsToGame(game, resource) && archiveAvailable(plugin, resource);
     }
 
@@ -461,6 +471,8 @@ public final class SourceMapCatalog {
     public static List<MapArchive> mapsFor(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return List.of();
         List<MapArchive> maps = new ArrayList<>();
+        if (game == ArcadePortGame.SNEAKY_ASSASSINS)
+            maps.add(new MapArchive(SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE, "100x100 Test Arena", true));
         for (String resource : availableMapResources(plugin, mapFoldersFor(game), game.displayName())) {
             maps.add(new MapArchive(resource, mapNameFromResource(resource), isInferredTestArchive(plugin, resource)));
         }
@@ -488,6 +500,7 @@ public final class SourceMapCatalog {
 
     public static String displayName(JavaPlugin plugin, String resource) {
         if (resource == null) return null;
+        if (SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE.equals(resource)) return "100x100 Test Arena";
         try (InputStream raw = openMapArchive(plugin, resource)) {
             if (raw == null) return mapNameFromResource(resource);
             try (ZipInputStream zip = new ZipInputStream(raw)) {
