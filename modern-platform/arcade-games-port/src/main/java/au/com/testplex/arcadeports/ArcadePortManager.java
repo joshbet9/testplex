@@ -8780,6 +8780,10 @@ public final class ArcadePortManager implements Listener {
             objective.getScore(ChatColor.RED + "Players Dead").setScore(2);
             objective.getScore(ChatColor.WHITE + Integer.toString(Math.max(0, total - alive))).setScore(1);
         }
+        long survivedMillis = session.dragonRoundStartedAt > 0L
+                ? Math.max(0L, now - session.dragonRoundStartedAt) : 0L;
+        objective.getScore(ChatColor.YELLOW + "Time Survived: "
+                + ArcadePortRules.formatDragonsSurvivalTime(survivedMillis)).setScore(0);
         for (Player player : roster) {
             if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
                 ArcadeCollisionRules.assign(player, scoreboard);

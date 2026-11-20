@@ -1696,6 +1696,12 @@ public final class ArcadePortRules {
         return 2;
     }
 
+    /** Dragons sidebar survival clock, rounded down to whole elapsed seconds. */
+    public static String formatDragonsSurvivalTime(long elapsedMillis) {
+        long totalSeconds = Math.max(0L, elapsedMillis) / 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L);
+    }
+
     /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
     public static Vector dragonsLeapVelocity(Vector facing, boolean grounded) {
         if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
