@@ -368,8 +368,17 @@ public final class SourceMapCatalog {
     }
 
     /** Return the selected map resource, preserving an existing legacy selection on upgrade. */
+    public static final String SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE = "testplex:sneaky-assassins/flat-100x100";
+
+    public static boolean isSneakyAssassinsFlatTest(ArcadePortGame game, String resource) {
+        return game == ArcadePortGame.SNEAKY_ASSASSINS
+                && SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE.equals(resource);
+    }
+
     public static String selectedResource(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return null;
+        if (isSneakyAssassinsFlatTest(game, plugin.getConfig().getString("selected-maps." + game.id())))
+            return SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE;
         String configured = plugin.getConfig().getString("selected-maps." + game.id());
         String legacy = resourceFor(game);
         String legacyName = displayName(plugin, legacy);
@@ -421,6 +430,7 @@ public final class SourceMapCatalog {
         // not selected ZIP archives. Validate its actual active world instead
         // of rejecting Fly's packaged worlds through the generic archive path.
         if (game.isMonsterMaze()) return isInstalledMonsterMazeWorld(plugin);
+        if (isSneakyAssassinsFlatTest(game, resource)) return true;
         return resourcePathBelongsToGame(game, resource) && archiveAvailable(plugin, resource);
     }
 
@@ -461,6 +471,8 @@ public final class SourceMapCatalog {
     public static List<MapArchive> mapsFor(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return List.of();
         List<MapArchive> maps = new ArrayList<>();
+        if (game == ArcadePortGame.SNEAKY_ASSASSINS)
+            maps.add(new MapArchive(SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE, "100x100 Test Arena", true));
         for (String resource : availableMapResources(plugin, mapFoldersFor(game), game.displayName())) {
             maps.add(new MapArchive(resource, mapNameFromResource(resource), isInferredTestArchive(plugin, resource)));
         }
@@ -488,6 +500,7 @@ public final class SourceMapCatalog {
 
     public static String displayName(JavaPlugin plugin, String resource) {
         if (resource == null) return null;
+        if (SNEAKY_ASSASSINS_FLAT_TEST_RESOURCE.equals(resource)) return "100x100 Test Arena";
         try (InputStream raw = openMapArchive(plugin, resource)) {
             if (raw == null) return mapNameFromResource(resource);
             try (ZipInputStream zip = new ZipInputStream(raw)) {
@@ -2213,6 +2226,42 @@ public final class SourceMapCatalog {
     private static int parseInt(String value, int fallback) {
         try { return Integer.parseInt(value.trim()); }
         catch (NumberFormatException ignored) { return fallback; }
+    }
+
+    /**
+     * Explicit, in-memory datapoints for the isolated 100x100 Sneaky Assassins test plane.
+     * This must never be saved over an authentic source map's WorldConfig.
+     */
+    public static MapData sneakyAssassinsFlatTestData(World world) {
+        MapData data = new MapData();
+        data.mapName = "Sneaky Assassins 100x100 Test";
+        data.minX = -50; data.maxX = 49;
+        data.minZ = -50; data.maxZ = 49;
+        data.minY = 63; data.maxY = 70;
+        data.hasMinX = data.hasMaxX = data.hasMinZ = data.hasMaxZ = true;
+        data.hasMinY = data.hasMaxY = true;
+        List<Location> starts = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            double angle = 2.0D * Math.PI * i / 16.0D;
+            starts.add(new Location(world, Math.cos(angle) * 38.0D + 0.5D, 64.0D,
+                    Math.sin(angle) * 38.0D + 0.5D, (float) Math.toDegrees(angle) + 90.0F, 0.0F));
+        }
+        data.teamSpawns.put("TEAM_0", starts);
+        data.dataLocations.put("RED", List.of(
+                new Location(world, -25.5D, 64.0D, -25.5D),
+                new Location(world, 25.5D, 64.0D, -25.5D),
+                new Location(world, -25.5D, 64.0D, 25.5D),
+                new Location(world, 25.5D, 64.0D, 25.5D)));
+        data.dataLocations.put("YELLOW", List.of(
+                new Location(world, -15.5D, 64.0D, -15.5D),
+                new Location(world, 15.5D, 64.0D, -15.5D),
+                new Location(world, -15.5D, 64.0D, 15.5D),
+                new Location(world, 15.5D, 64.0D, 15.5D),
+                new Location(world, 0.5D, 64.0D, -20.5D),
+                new Location(world, 20.5D, 64.0D, 0.5D),
+                new Location(world, 0.5D, 64.0D, 20.5D),
+                new Location(world, -20.5D, 64.0D, 0.5D)));
+        return data;
     }
 
     public static final class MapData {
