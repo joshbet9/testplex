@@ -222,23 +222,41 @@ final class DragonEscapeMovementKits {
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 
-    static final double DISRUPTOR_SELF_BOOST_SPEED = 0.9D;
+    static final double DISRUPTOR_MINE_BLAST_IMPULSE = 1.65D;
 
     static boolean shouldSelfTriggerDragonEscapeMine(
-            boolean sameOwner, boolean sneaking, int itemAgeTicks, double distanceToMine,
+            boolean sameOwner, int itemAgeTicks, double distanceToMine,
             int armTicks, double triggerRadius) {
-        return sameOwner && sneaking && itemAgeTicks >= Math.max(0, armTicks)
+        return sameOwner && itemAgeTicks >= Math.max(0, armTicks)
                 && Double.isFinite(distanceToMine) && distanceToMine >= 0.0D
                 && Double.isFinite(triggerRadius) && triggerRadius >= 0.0D
                 && distanceToMine <= triggerRadius;
     }
 
-    /** Aim pitch and yaw choose the complete three-dimensional launch direction. */
-    static Vector disruptorSelfBoostVelocity(Vector facing) {
-        if (facing == null || !Double.isFinite(facing.getX())
-                || !Double.isFinite(facing.getY()) || !Double.isFinite(facing.getZ())
-                || facing.lengthSquared() < 1.0E-8D) return new Vector();
-        return facing.clone().normalize().multiply(DISRUPTOR_SELF_BOOST_SPEED);
+    /**
+     * Models a TNT jump: the armed mine pushes the player away from its blast
+     * centre, adding the impulse to their existing movement. The player's
+     * position relative to the mine controls horizontal versus vertical travel.
+     */
+    static Vector disruptorMineBlastVelocity(
+            Vector currentVelocity, Vector playerPosition, Vector minePosition, double triggerRadius) {
+        Vector velocity = currentVelocity == null ? new Vector() : currentVelocity.clone();
+        if (playerPosition == null || minePosition == null
+                || !isFiniteVector(playerPosition) || !isFiniteVector(minePosition)
+                || !Double.isFinite(triggerRadius) || triggerRadius <= 0.0D) return velocity;
+        Vector away = playerPosition.clone().subtract(minePosition);
+        double distance = away.length();
+        if (!Double.isFinite(distance) || distance > triggerRadius) return velocity;
+        if (distance < 1.0E-6D) away.setY(1.0D);
+        else away.normalize();
+        double strength = DISRUPTOR_MINE_BLAST_IMPULSE
+                * Math.max(0.35D, 1.0D - (distance / triggerRadius) * 0.4D);
+        return velocity.add(away.multiply(strength));
+    }
+
+    private static boolean isFiniteVector(Vector vector) {
+        return Double.isFinite(vector.getX()) && Double.isFinite(vector.getY())
+                && Double.isFinite(vector.getZ());
     }
 
     static boolean shouldShowDragonEscapeLeapItem(int remainingUses) {

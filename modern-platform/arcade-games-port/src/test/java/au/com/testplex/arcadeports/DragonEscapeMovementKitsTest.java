@@ -133,39 +133,42 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void disruptorCanOnlySelfTriggerAnArmedMineWhileSneakingWithinExistingPickupRadius() {
+    void disruptorCanSelfTriggerAnArmedMineWithoutSneakingWithinExistingPickupRadius() {
         assertTrue(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 40, 1.5D, 40, 2.0D));
+                true, 40, 1.5D, 40, 2.0D));
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                false, true, 40, 1.0D, 40, 2.0D), "A mine owned by another player is not self-triggerable");
+                false, 40, 1.0D, 40, 2.0D), "A mine owned by another player is not self-triggerable");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, false, 40, 1.0D, 40, 2.0D), "Sneaking distinguishes boost activation from placement");
+                true, 39, 1.0D, 40, 2.0D), "An unarmed mine cannot launch its owner");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 39, 1.0D, 40, 2.0D), "An unarmed mine cannot launch its owner");
+                true, 40, 2.01D, 40, 2.0D), "Keep the existing pickup radius");
         assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 40, 2.01D, 40, 2.0D), "Keep the existing pickup radius");
-        assertFalse(DragonEscapeMovementKits.shouldSelfTriggerDragonEscapeMine(
-                true, true, 40, Double.NaN, 40, 2.0D));
+                true, 40, Double.NaN, 40, 2.0D));
     }
 
     @Test
-    void disruptorSelfBoostUsesFullAimVectorAndKeepsSpeedCapped() {
-        assertEquals(0.9D, DragonEscapeMovementKits.DISRUPTOR_SELF_BOOST_SPEED, 0.00001D);
-        Vector east = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(1, 0, 0));
-        assertEquals(0.9D, east.getX(), 0.00001D);
-        assertEquals(0.0D, east.getY(), 0.00001D);
-        assertEquals(0.0D, east.getZ(), 0.00001D);
+    void disruptorSelfLaunchUsesBlastDirectionAndAddsTntLikeImpulse() {
+        Vector current = new Vector(0.2D, -0.1D, 0.0D);
+        Vector mine = new Vector(0.0D, 0.0D, 0.0D);
+        Vector above = DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                current, new Vector(0.0D, 1.0D, 0.0D), mine, 2.0D);
+        assertEquals(0.2D, above.getX(), 0.00001D);
+        assertTrue(above.getY() > 1.0D, "A mine below the player produces a strong upward launch");
+        assertEquals(0.0D, above.getZ(), 0.00001D);
 
-        Vector up = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(0, 1, 0));
-        assertEquals(0.0D, up.getX(), 0.00001D);
-        assertEquals(0.9D, up.getY(), 0.00001D);
-        assertEquals(0.0D, up.getZ(), 0.00001D);
+        Vector east = DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                new Vector(), new Vector(1.0D, 0.25D, 0.0D), mine, 2.0D);
+        assertTrue(east.getX() > 1.0D, "Position beside the mine controls horizontal launch direction");
+        assertTrue(east.getY() > 0.0D, "The blast retains an upward component");
 
-        Vector diagonal = DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector(1, 1, 1));
-        assertEquals(0.9D, diagonal.length(), 0.00001D);
-        assertTrue(diagonal.getX() > 0.0D && diagonal.getY() > 0.0D && diagonal.getZ() > 0.0D);
-        assertEquals(0.0D, DragonEscapeMovementKits.disruptorSelfBoostVelocity(null).length(), 0.00001D);
-        assertEquals(0.0D, DragonEscapeMovementKits.disruptorSelfBoostVelocity(new Vector()).length(), 0.00001D);
+        Vector west = DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                new Vector(), new Vector(-1.0D, 0.25D, 0.0D), mine, 2.0D);
+        assertTrue(west.getX() < -1.0D, "Moving to the opposite side reverses the horizontal launch");
+        assertEquals(current, DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                current, new Vector(3.0D, 0.0D, 0.0D), mine, 2.0D),
+                "The mine has no self-launch effect outside its trigger radius");
+        assertEquals(current, DragonEscapeMovementKits.disruptorMineBlastVelocity(
+                current, null, mine, 2.0D), "Invalid positions do not create an impulse");
     }
 
     @Test
