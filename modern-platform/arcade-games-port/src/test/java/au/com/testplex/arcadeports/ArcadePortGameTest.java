@@ -1035,10 +1035,23 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, true, 1, 1_049L, 1_050L));
         assertFalse(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("acrobat"));
         assertTrue(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("jumper"));
+        assertEquals(Long.MAX_VALUE, ArcadePortRules.bombLobbersFallDistanceResetUntil(1_000L),
+                "Protection lasts through the double-jump flight, not a fixed 200 ms window");
         assertTrue(ArcadePortRules.shouldResetBombLobbersFallDistance(1_100L, 1_200L));
+        assertTrue(ArcadePortRules.shouldResetBombLobbersFallDistance(100_000L, Long.MAX_VALUE),
+                "The jump-flight reset remains active until a landing retires it");
         assertFalse(ArcadePortRules.shouldResetBombLobbersFallDistance(0L, 0L));
         assertFalse(ArcadePortRules.shouldResetBombLobbersFallDistance(1_201L, 1_200L),
-                "Normal fall distance accumulates again after the short post-launch reset window");
+                "Normal fall distance resumes once the reset state is removed");
+        assertFalse(ArcadePortRules.shouldEndBombLobbersFallDistanceReset(false, true));
+        assertFalse(ArcadePortRules.shouldEndBombLobbersFallDistanceReset(true, false));
+        assertTrue(ArcadePortRules.shouldEndBombLobbersFallDistanceReset(true, true),
+                "The first landing after an observed double-jump flight ends fall protection");
+        assertTrue(ArcadePortRules.shouldCancelBombLobbersDoubleJumpFallDamage(true, true));
+        assertFalse(ArcadePortRules.shouldCancelBombLobbersDoubleJumpFallDamage(true, false),
+                "After that landing, a later long fall uses normal fall damage");
+        assertFalse(ArcadePortRules.shouldCancelBombLobbersDoubleJumpFallDamage(false, true),
+                "Eliminated players do not retain the double-jump protection");
         var look = new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D);
         var airborne = ArcadePortRules.bombLobbersDoubleJumpVelocity(look, 1.2D, false);
         var grounded = ArcadePortRules.bombLobbersDoubleJumpVelocity(look, 1.2D, true);
@@ -1166,12 +1179,40 @@ class ArcadePortGameTest {
         assertEquals(12_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L, "armorer"));
         assertEquals(20_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L, "pitcher"),
                 "Pitcher's kit TNT must not be duplicated by the immediate first Craftman refill");
+        assertEquals("Throwing TNT", ArcadePortRules.bombLobbersTntItemName("acrobat"));
+        assertEquals(ArcadePortRules.bombLobbersTntItemName("acrobat"),
+                ArcadePortRules.bombLobbersTntItemName("pitcher"),
+                "Pitcher changes its throw trajectory, not the shared TNT item");
+        boolean[] emptyHotbar = new boolean[9];
+        assertEquals(1, ArcadePortRules.firstEmptyBombLobbersPowerupSlot("acrobat", emptyHotbar),
+                "Power-ups never occupy the reserved TNT slot");
+        assertEquals(2, ArcadePortRules.firstEmptyBombLobbersPowerupSlot("constructor", emptyHotbar),
+                "Constructor's build tool keeps its reserved second slot");
+        emptyHotbar[1] = true;
+        assertEquals(2, ArcadePortRules.firstEmptyBombLobbersPowerupSlot("acrobat", emptyHotbar),
+                "Additional power-ups use the next free hotbar slot");
+        assertEquals(-1, ArcadePortRules.firstEmptyBombLobbersPowerupSlot("acrobat", new boolean[8]));
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L));
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_000L));
         assertEquals(7_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_001L));
         assertEquals(6_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(40_001L));
         assertEquals(5_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(60_001L));
         assertEquals(4_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(620_001L));
+        assertEquals(5_334L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L, 1.5D));
+        assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L, Double.NaN));
+        assertEquals(4_334L, ArcadePortRules.bombLobbersAcceleratedCraftAt(1_000L, 6_000L,
+                15_000L, 1.5D), "The current refill countdown accelerates as soon as the powerup is used");
+        assertEquals(23_500L, ArcadePortRules.bombLobbersAcceleratedCraftAt(1_000L, 31_000L,
+                15_000L, 1.5D), "Only the first 15 seconds use the temporary increased rate");
+        assertEquals(1.0D, ArcadePortRules.bombLobbersTntMultiplier(16, 16, 0L, 1_200_000L), 0.00001D);
+        assertEquals(1.35D, ArcadePortRules.bombLobbersTntMultiplier(16, 8, 0L, 1_200_000L), 0.00001D);
+        assertEquals(1.15D, ArcadePortRules.bombLobbersTntMultiplier(16, 16, 600_000L, 1_200_000L), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.bombLobbersTntMultiplier(16, 0, 1_200_000L, 1_200_000L), 0.00001D);
+        assertEquals(15_000L, ArcadePortRules.bombLobbersTntRatePowerupExpiresAt(0L));
+        assertTrue(ArcadePortRules.bombLobbersTimedPowerupActive(14_999L,
+                ArcadePortRules.bombLobbersTntRatePowerupExpiresAt(0L)));
+        assertFalse(ArcadePortRules.bombLobbersTimedPowerupActive(15_000L,
+                ArcadePortRules.bombLobbersTntRatePowerupExpiresAt(0L)));
         assertFalse(ArcadePortRules.shouldPrimeBombLobbersBomb(2_999L, true));
         assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(3_000L, true));
         assertFalse(ArcadePortRules.shouldPrimeBombLobbersBomb(7_999L, false));
