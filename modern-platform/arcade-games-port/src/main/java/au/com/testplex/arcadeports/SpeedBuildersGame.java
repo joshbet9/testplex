@@ -560,6 +560,27 @@ public final class SpeedBuildersGame implements Listener {
             Bukkit.broadcastMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SPEED BUILDERS");
             Bukkit.broadcastMessage(ChatColor.YELLOW + "Memorise the model, then rebuild it in your own plot.");
             beginRound();
+            // Other lobby listeners may still have a queued post-start teleport.
+            // Verify the final location after the match has started rather than
+            // trusting a successful initial teleport that can be overridden.
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (phase != Phase.VIEWING && phase != Phase.BUILDING) return;
+                for (PlayerState state : players.values()) {
+                    if (!state.player.isOnline() || players.get(state.player.getUniqueId()) != state) continue;
+                    Location expected = nearestSourceSpawn(state.plot);
+                    if (state.player.getWorld() == expected.getWorld()
+                            && state.player.getLocation().distanceSquared(expected) <= 64.0D) continue;
+                    plugin.getLogger().warning("Speed Builders start moved " + state.player.getName()
+                            + " away from their assigned plot; restoring their match spawn.");
+                    try {
+                        teleportToPlot(state);
+                    } catch (RuntimeException failure) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Speed Builders could not restore " + state.player.getName()
+                                        + " to their match plot.", failure);
+                    }
+                }
+            }, 5L);
         } catch (RuntimeException | Error failure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
                     "Could not start the Speed Builders test module.", failure);
