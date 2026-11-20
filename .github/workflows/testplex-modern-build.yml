@@ -612,7 +612,10 @@ jobs:
           fi
           flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
           state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after.json")"
-          if [[ "$state" == "stopped" || "$state" == "suspended" ]]; then
+          # Updating autostop on an idle Fly Machine can leave it in `created`
+          # until an explicit start request. Treat that as startable instead of
+          # aborting and then waiting for the exit trap to restore the policy.
+          if [[ "$state" == "stopped" || "$state" == "suspended" || "$state" == "created" ]]; then
             flyctl machine start "$machine_id" --app "$FLY_APP"
           elif [[ "$state" != "started" ]]; then
             echo "Cannot start Fly Machine from unexpected state [$state]." >&2
