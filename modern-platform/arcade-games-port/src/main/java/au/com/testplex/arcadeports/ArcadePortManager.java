@@ -17008,6 +17008,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonFlightVectors.remove(id);
                 session.dragonLastBlockDamageLocation.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
+                session.dragonSparklerTargetByDragon.remove(id);
                 it.remove();
             }
         }
@@ -17164,8 +17165,8 @@ public final class ArcadePortManager implements Listener {
                 // treat the saved map coordinates as a destination.
                 double targetDistanceSquared = target == null ? Double.POSITIVE_INFINITY
                         : dragon.getLocation().distanceSquared(target);
-                boolean needsRacerTarget = targetPlayerId == null && sparklerMarker == null
-                        && !possibleTargets.isEmpty();
+                boolean needsRacerTarget = ArcadePortRules.dragonsShouldAcquireRacer(
+                        possibleTargets.size(), sparklerMarker != null) && targetPlayerId == null;
                 if (sparklerMarker == null && (needsRacerTarget || ArcadePortRules.shouldRetargetDragon(
                         dragon.getLocation().getY(), targetDistanceSquared, target != null))) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
