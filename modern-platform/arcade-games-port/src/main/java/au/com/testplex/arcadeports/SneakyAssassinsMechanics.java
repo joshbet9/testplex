@@ -365,7 +365,7 @@ final class SneakyAssassinsMechanics {
                 .filter(location -> location.getWorld() == world).map(Location::clone).toList();
         // Remove legacy persistent villagers left behind by earlier test rounds.
         // Only the dedicated test world gets an unrestricted NPC cleanup.
-        if (world != null && "arcadeport_sneaky_assassins_flat_test".equals(world.getName())) {
+        if (world != null && "arcadeport_proto_sneaky_assassins".equals(world.getName())) {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof Villager) entity.remove();
             }
