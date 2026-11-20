@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -22,6 +23,15 @@ class BombLobbersPitcherTrajectoryTest {
         assertEquals(20.0D, impact.getX(), 0.01D);
         assertEquals(1.0D, impact.getY(), 0.01D);
         assertEquals(0.0D, impact.getZ(), 0.01D);
+    }
+
+    @Test
+    void targetRayIncludesDestroyableBlocksAndSkipsExplosionProofBlocks() {
+        assertTrue(BombLobbersPitcherTrajectory.isDestroyableBlock(Material.STONE));
+        assertTrue(BombLobbersPitcherTrajectory.isDestroyableBlock(Material.RED_WOOL));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(Material.AIR));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(Material.BEDROCK));
+        assertFalse(BombLobbersPitcherTrajectory.isDestroyableBlock(Material.OBSIDIAN));
     }
 
     @Test
