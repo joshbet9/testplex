@@ -21279,6 +21279,7 @@ public final class ArcadePortManager implements Listener {
             session.bombDoubleJumpAvailable.remove(victimId);
             session.bombDoubleJumpJumpsSinceGround.remove(victimId);
             session.bombDoubleJumpAirborneSinceUse.remove(victimId);
+            session.bombDoubleJumpFallResetUntil.remove(victimId);
             player.leaveVehicle();
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);
@@ -24116,6 +24117,7 @@ public final class ArcadePortManager implements Listener {
         session.bombDoubleJumpCounts.clear();
         session.bombDoubleJumpJumpsSinceGround.clear();
         session.bombDoubleJumpAirborneSinceUse.clear();
+        session.bombDoubleJumpFallResetUntil.clear();
         session.bombMvpPressurePlayers.clear();
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
@@ -35006,6 +35008,12 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
+            long fallResetUntil = session.bombDoubleJumpFallResetUntil.getOrDefault(id, 0L);
+            if (ArcadePortRules.shouldResetBombLobbersFallDistance(now, fallResetUntil)) {
+                player.setFallDistance(0.0F);
+            } else if (fallResetUntil > 0L) {
+                session.bombDoubleJumpFallResetUntil.remove(id);
+            }
             long doubleJumpReadyAt = session.bombDoubleJumpReadyAt.getOrDefault(id, 0L);
             int jumpsSinceGround = session.bombDoubleJumpJumpsSinceGround.getOrDefault(id, 0);
             boolean grounded = player.isOnGround();
@@ -35031,8 +35039,9 @@ public final class ArcadePortManager implements Listener {
             // Recharge.use() returns true immediately when the source cooldown key is absent.
             // The opening Craftman grant therefore arrives on the first live FAST update, then
             // subsequent grants use the game-time-dependent 8/7/6/5/4-second intervals.
+            String kit = session.bombLobbersKits.getOrDefault(id, "acrobat");
             long nextGrant = session.bombNextCraftAt.computeIfAbsent(id,
-                    ignored -> ArcadePortRules.bombLobbersFirstCraftReadyAt(now));
+                    ignored -> ArcadePortRules.bombLobbersFirstCraftReadyAt(now, kit));
             if (now >= nextGrant) {
                 if (ArcadePortRules.bombLobbersCanCarryMoreTnt(inventoryCount(player, Material.TNT))) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
@@ -35914,9 +35923,11 @@ public final class ArcadePortManager implements Listener {
         double power = "acrobat".equals(kit) ? 1.2D : 0.9D;
         Vector velocity = ArcadePortRules.bombLobbersDoubleJumpVelocity(
                 player.getLocation().getDirection(), power, player.isOnGround());
-        player.setFallDistance(0.0F);
-        player.setVelocity(velocity);
         long now = System.currentTimeMillis();
+        player.setFallDistance(0.0F);
+        session.bombDoubleJumpFallResetUntil.put(id,
+                ArcadePortRules.bombLobbersFallDistanceResetUntil(now));
+        player.setVelocity(velocity);
         long readyAt = ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(now);
         session.bombDoubleJumpReadyAt.put(id, readyAt);
         if (ArcadePortRules.bombLobbersShowsDoubleJumpCooldown(kit)) {

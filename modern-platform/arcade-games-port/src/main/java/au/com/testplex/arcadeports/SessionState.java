@@ -536,6 +536,8 @@ class SessionState {
     final Map<UUID, Map<UUID, Long>> bombDamageContributors = new HashMap<>();
     final Map<UUID, Integer> bombAssists = new HashMap<>();
     final Map<UUID, Long> bombDoubleJumpReadyAt = new HashMap<>();
+    /** Briefly clears stale fall distance carried into the first physics ticks after a jump. */
+    final Map<UUID, Long> bombDoubleJumpFallResetUntil = new HashMap<>();
     final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
     final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
     long bombNextBoundaryCheckAt;
