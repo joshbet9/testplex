@@ -225,10 +225,9 @@ class DragonEscapeMovementKitsTest {
                 new Vector(0, 0, 1), new Vector(0, 0, -1)
         }) {
             Location anchor = DragonEscapeMovementKits.wallClingAnchor(contact, normal);
-            assertEquals(0.04D, anchor.getX() - contact.getX() == 0.0D
-                    ? Math.abs(anchor.getZ() - contact.getZ())
-                    : Math.abs(anchor.getX() - contact.getX()), 0.00001D);
+            assertEquals(contact.getX() + normal.getX() * 0.04D, anchor.getX(), 0.00001D);
             assertEquals(contact.getY(), anchor.getY(), 0.00001D);
+            assertEquals(contact.getZ() + normal.getZ() * 0.04D, anchor.getZ(), 0.00001D);
             assertEquals(contact.getYaw(), anchor.getYaw(), 0.00001F);
             assertEquals(contact.getPitch(), anchor.getPitch(), 0.00001F);
         }
