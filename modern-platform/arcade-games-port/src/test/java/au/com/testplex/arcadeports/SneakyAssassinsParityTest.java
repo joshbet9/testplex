@@ -235,7 +235,14 @@ class SneakyAssassinsParityTest {
         assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(0, 1));
         assertEquals(12_000L, SneakyAssassinsRules.firstPowerUpDelayMillis());
         assertEquals(7_000L, SneakyAssassinsRules.nextPowerUpDelayMillis());
-        assertEquals(2, SneakyAssassinsRules.maxActivePowerUps());
+        assertTrue(SneakyAssassinsRules.shouldSpawnPowerUp(0, 0));
+        assertTrue(SneakyAssassinsRules.shouldSpawnPowerUp(1, 0));
+        assertFalse(SneakyAssassinsRules.shouldSpawnPowerUp(1, 1));
+        assertTrue(SneakyAssassinsRules.shouldSpawnPowerUp(2, 0));
+        assertFalse(SneakyAssassinsRules.shouldSpawnPowerUp(2, 1));
+        assertFalse(SneakyAssassinsRules.shouldSpawnPowerUp(2, 2));
+        assertFalse(SneakyAssassinsRules.shouldSpawnPowerUp(2, -1));
+        assertFalse(SneakyAssassinsRules.shouldSpawnPowerUp(2, 3));
     }
 
     @Test void approvedAchievementConditionsUseExactGameEventsAndThresholds() {
