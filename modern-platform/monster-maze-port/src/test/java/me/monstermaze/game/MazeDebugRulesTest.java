@@ -8,8 +8,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class MazeDebugRulesTest {
-    @Test void mobMovementSpeedDefaultsToSourceAndDebugOverrideIsConsumed() {
-        assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+    @Test void mobMovementSpeedIsTwentyFivePercentBelowSourceAndDebugOverrideIsConsumed() {
+        assertEquals(0.6F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
         assertEquals(0.14D, MazeDebugRules.sourceMobMoveStep(0.8F, 25.0D, 3.0D), 0.00001D);
         assertEquals(0.175D, MazeDebugRules.sourceMobMoveStep(1.6F, 1.0D, 3.0D), 0.00001D,
                 "within two blocks Reborn caps the requested speed at 1.0");
@@ -20,9 +20,10 @@ class MazeDebugRulesTest {
         assertEquals(0.28D, MazeDebugRules.sourceMobMoveStep(
                 MazeDebugRules.mobMoveSpeed(MazeMode.MODERN), 25.0D, 3.0D), 0.00001D);
         GameDebugRuntimeOverrides.clear();
-        assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        assertEquals(0.14D, MazeDebugRules.sourceMobMoveStep(
-                MazeDebugRules.mobMoveSpeed(MazeMode.MODERN), 25.0D, 3.0D), 0.00001D);
+        assertEquals(0.6F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.105D, MazeDebugRules.sourceMobMoveStep(
+                MazeDebugRules.mobMoveSpeed(MazeMode.MODERN), 25.0D, 3.0D), 0.00001D,
+                "the restored step is 25% slower than the 0.8 source default");
     }
 
     @Test void playerPersonalBestsPersistEvenDuringDebugRoundsButNeverForSyntheticPlayers() {
