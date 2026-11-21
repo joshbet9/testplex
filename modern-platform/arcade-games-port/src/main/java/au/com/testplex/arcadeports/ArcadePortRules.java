@@ -5088,6 +5088,12 @@ public final class ArcadePortRules {
                 && x >= minX && x < maxXExclusive && z >= minZ && z < maxZExclusive;
     }
 
+    /** Turf Wars revalidates cancelled break attempts itself so enemy wool can be cleared safely. */
+    public static boolean shouldSkipCancelledBlockBreak(ArcadePortGame game, boolean eventCancelled) {
+        return eventCancelled && game != ArcadePortGame.MICRO_BATTLES
+                && game != ArcadePortGame.MASTER_BUILDERS && game != ArcadePortGame.TURF_WARS;
+    }
+
     /** Only the half of the arena on the team's side of the current line may be built on. */
     public static boolean canTurfWarsBuildOnTerritory(int teamId, int x, int frontline) {
         if (teamId == 0) return x <= frontline;
