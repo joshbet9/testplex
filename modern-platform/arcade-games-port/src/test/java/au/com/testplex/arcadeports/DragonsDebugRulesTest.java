@@ -150,9 +150,9 @@ class DragonsDebugRulesTest {
     }
 
     @Test
-    void autonomousDragonsUseNativeChargePhaseForRacerAndSparklerTargets() {
-        assertEquals(EnderDragon.Phase.CHARGE_PLAYER, ArcadePortRules.dragonsAutonomousPhase(true));
-        assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
+    void autonomousDragonsTrackLivingTargetsAndDoNotRouteToTheEndPortal() {
+        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+        assertEquals(EnderDragon.Phase.HOVER, ArcadePortRules.dragonsAutonomousPhase(false));
     }
 
     @Test
