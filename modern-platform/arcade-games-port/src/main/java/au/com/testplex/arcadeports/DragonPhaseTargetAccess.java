@@ -1,11 +1,12 @@
 package au.com.testplex.arcadeports;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.EnderDragon;
-import org.bukkit.entity.LivingEntity;
 
-/** Bridges Bukkit's Mob target API to the separate target held by the dragon's native flight phase. */
+/** Bridges Bukkit dragon phases to the native charge phase's moving position target. */
 final class DragonPhaseTargetAccess {
     private static volatile Access access;
     private static volatile boolean accessFailureLogged;
@@ -13,37 +14,33 @@ final class DragonPhaseTargetAccess {
 
     private DragonPhaseTargetAccess() { }
 
-    static boolean setStrafingTarget(EnderDragon dragon, LivingEntity target) {
+    static boolean setChargeTarget(EnderDragon dragon, Location target) {
         if (dragon == null || target == null || dragon.getWorld() != target.getWorld()
-                || dragon.getPhase() != EnderDragon.Phase.STRAFING) return false;
+                || dragon.getPhase() != EnderDragon.Phase.CHARGE_PLAYER) return false;
         if (access == null && accessFailureLogged) return false;
         try {
             Access resolved = access;
             if (resolved == null) {
                 synchronized (DragonPhaseTargetAccess.class) {
                     resolved = access;
-                    if (resolved == null) access = resolved = resolve(dragon, target);
+                    if (resolved == null) access = resolved = resolve(dragon);
                 }
             }
             Object dragonHandle = nativeHandle(dragon);
             Object phaseManager = resolved.getPhaseManager.invoke(dragonHandle);
-            Object strafePhase = resolved.getCurrentPhase.invoke(phaseManager);
-            // CraftEnderDragon and CraftPlayer/CraftArmorStand declare different
-            // covariant getHandle() methods. A Method resolved from the dragon
-            // class cannot be invoked on the target wrapper, so resolve it from
-            // the actual target runtime class each time a target changes.
-            Object targetHandle = nativeHandle(target);
-            resolved.setTargetEntity.invoke(strafePhase, targetHandle);
+            Object chargePhase = resolved.getCurrentPhase.invoke(phaseManager);
+            Object vector = resolved.vectorConstructor.newInstance(target.getX(), target.getY(), target.getZ());
+            resolved.setTarget.invoke(chargePhase, vector);
             if (!accessSuccessLogged) {
                 accessSuccessLogged = true;
-                Bukkit.getLogger().info("[Testplex] Native Ender Dragon STRAFE_PLAYER target access is active.");
+                Bukkit.getLogger().info("[Testplex] Native Ender Dragon charge-position targeting is active.");
             }
             return true;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             if (!accessFailureLogged) {
                 accessFailureLogged = true;
-                Bukkit.getLogger().severe("[Testplex] Could not set the Ender Dragon native pursuit target; "
-                        + "Bukkit's general Mob target does not drive the STRAFING phase: " + exception);
+                Bukkit.getLogger().severe("[Testplex] Could not set the Ender Dragon native charge target: "
+                        + exception);
             }
             return false;
         }
@@ -53,32 +50,32 @@ final class DragonPhaseTargetAccess {
         return bukkitEntity.getClass().getMethod("getHandle").invoke(bukkitEntity);
     }
 
-    private static Access resolve(EnderDragon dragon, LivingEntity target) throws ReflectiveOperationException {
-        Method bukkitHandle = dragon.getClass().getMethod("getHandle");
+    private static Access resolve(EnderDragon dragon) throws ReflectiveOperationException {
         Object dragonHandle = nativeHandle(dragon);
         Method getPhaseManager = dragonHandle.getClass().getMethod("getPhaseManager");
         Object phaseManager = getPhaseManager.invoke(dragonHandle);
         Method getCurrentPhase = phaseManager.getClass().getMethod("getCurrentPhase");
-        Object strafePhase = getCurrentPhase.invoke(phaseManager);
-        Object targetHandle = nativeHandle(target);
-        Method setTargetEntity = null;
-        for (String methodName : new String[] {"setTargetEntity", "setTarget"}) {
-            for (Method candidate : strafePhase.getClass().getMethods()) {
-                if (candidate.getName().equals(methodName)
-                        && candidate.getParameterCount() == 1
-                        && candidate.getParameterTypes()[0].isInstance(targetHandle)) {
-                    setTargetEntity = candidate;
-                    break;
-                }
+        Object chargePhase = getCurrentPhase.invoke(phaseManager);
+
+        Method setTarget = null;
+        Constructor<?> vectorConstructor = null;
+        for (Method candidate : chargePhase.getClass().getMethods()) {
+            if (!candidate.getName().equals("setTarget") || candidate.getParameterCount() != 1) continue;
+            Class<?> vectorType = candidate.getParameterTypes()[0];
+            try {
+                vectorConstructor = vectorType.getConstructor(double.class, double.class, double.class);
+                setTarget = candidate;
+                break;
+            } catch (NoSuchMethodException ignored) {
+                // Other setTarget overloads may accept entities or unrelated values.
             }
-            if (setTargetEntity != null) break;
         }
-        if (setTargetEntity == null) {
-            throw new NoSuchMethodException("native dragon flight phase has no LivingEntity target setter");
+        if (setTarget == null || vectorConstructor == null) {
+            throw new NoSuchMethodException("native charge phase has no vector position target setter");
         }
-        return new Access(bukkitHandle, getPhaseManager, getCurrentPhase, setTargetEntity);
+        return new Access(getPhaseManager, getCurrentPhase, setTarget, vectorConstructor);
     }
 
-    private record Access(Method bukkitHandle, Method getPhaseManager, Method getCurrentPhase,
-            Method setTargetEntity) { }
+    private record Access(Method getPhaseManager, Method getCurrentPhase, Method setTarget,
+            Constructor<?> vectorConstructor) { }
 }

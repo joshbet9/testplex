@@ -152,7 +152,7 @@ class DragonsDebugRulesTest {
 
     @Test
     void autonomousDragonsTrackLivingTargetsAndDoNotRouteToTheEndPortal() {
-        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+        assertEquals(EnderDragon.Phase.CHARGE_PLAYER, ArcadePortRules.dragonsAutonomousPhase(true));
         assertEquals(EnderDragon.Phase.HOVER, ArcadePortRules.dragonsAutonomousPhase(false));
     }
 

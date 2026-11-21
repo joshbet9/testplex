@@ -17060,22 +17060,13 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 UUID dragonId = dragon.getUniqueId();
-                // Acquire a racer immediately. The old altitude gate could strand the
-                // dragon in FLY_TO_PORTAL on a custom map indefinitely.
-                Player initialTarget = possibleTargets.isEmpty() ? null
-                        : possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size()));
-                if (initialTarget != null) {
-                    session.dragonTargetPlayers.put(dragonId, initialTarget.getUniqueId());
-                    session.dragonTargetLocations.put(dragonId, initialTarget.getLocation().clone());
-                } else {
-                    Location initialSkyTarget = randomDragonSkyTarget(session);
-                    session.dragonTargetLocations.put(dragonId, initialSkyTarget);
-                    dragon.setPodium(initialSkyTarget);
-                }
-                EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(initialTarget != null);
+                // Reborn starts each dragon on a sky waypoint, then switches between
+                // waypoints and players as it reaches its current target.
+                Location initialSkyTarget = randomDragonSkyTarget(session);
+                session.dragonTargetLocations.put(dragonId, initialSkyTarget);
+                EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(false);
                 dragon.setPhase(initialPhase);
-                dragon.setTarget(initialTarget);
-                if (initialTarget != null) setDragonNativePhaseTarget(session, dragon, initialTarget, true);
+                dragon.setTarget(null);
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -17175,12 +17166,13 @@ public final class ArcadePortManager implements Listener {
                 // treat the saved map coordinates as a destination.
                 double targetDistanceSquared = target == null ? Double.POSITIVE_INFINITY
                         : dragon.getLocation().distanceSquared(target);
-                boolean needsRacerTarget = ArcadePortRules.dragonsShouldAcquireRacer(
-                        possibleTargets.size(), sparklerMarker != null) && targetPlayerId == null;
-                if (sparklerMarker == null && (needsRacerTarget || ArcadePortRules.shouldRetargetDragon(
-                        dragon.getLocation().getY(), targetDistanceSquared, target != null))) {
+                boolean shouldRetarget = ArcadePortRules.shouldRetargetDragon(
+                        dragon.getLocation().getY(), targetDistanceSquared, target != null);
+                if (sparklerMarker == null && shouldRetarget) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
-                    if (!possibleTargets.isEmpty()) {
+                    double spectatorY = dragonSpectatorLocation(session).getY();
+                    if (dragon.getLocation().getY() >= ArcadePortRules.DRAGONS_RETARGET_ALTITUDE_Y
+                            && dragon.getLocation().getY() > spectatorY && !possibleTargets.isEmpty()) {
                         Player newTarget = possibleTargets.get(
                                 ThreadLocalRandom.current().nextInt(possibleTargets.size()));
                         session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
@@ -17209,21 +17201,18 @@ public final class ArcadePortManager implements Listener {
                         && session.alive.contains(selectedPlayer.getUniqueId())) {
                     removeDragonWaypointMarker(session, dragonId);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(selectedPlayer);
-                    // Mob#setTarget updates the general target only. The native dragon flight phase
-                    // has its own attackTarget; refresh only on target/phase changes so its native
-                    // path is not discarded every 125 ms while tracking a moving player.
-                    setDragonNativePhaseTarget(session, dragon, selectedPlayer, phaseChanged);
+                    // CHARGE_PLAYER follows a native position target. Refresh that position on the
+                    // source FASTEST cadence so a moving player or sparkler remains the destination.
+                    setDragonNativePhaseTarget(session, dragon, selectedPlayer);
                 } else if (selectedMarker instanceof org.bukkit.entity.LivingEntity livingMarker
                         && selectedMarker.isValid()) {
                     removeDragonWaypointMarker(session, dragonId);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(livingMarker);
-                    setDragonNativePhaseTarget(session, dragon, livingMarker, phaseChanged);
+                    setDragonNativePhaseTarget(session, dragon, livingMarker);
                 } else {
                     Location waypoint = session.dragonTargetLocations.get(dragonId);
                     if (waypoint == null) {
@@ -17232,11 +17221,10 @@ public final class ArcadePortManager implements Listener {
                     }
                     org.bukkit.entity.ArmorStand waypointMarker = dragonWaypointMarker(session, dragonId, waypoint);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(waypointMarker != null);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(waypointMarker);
                     if (waypointMarker != null) {
-                        setDragonNativePhaseTarget(session, dragon, waypointMarker, phaseChanged);
+                        setDragonNativePhaseTarget(session, dragon, waypointMarker);
                     }
                 }
             }
@@ -17410,12 +17398,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setDragonNativePhaseTarget(Session session, EnderDragon dragon,
-            org.bukkit.entity.LivingEntity target, boolean phaseChanged) {
+            org.bukkit.entity.LivingEntity target) {
         UUID dragonId = dragon.getUniqueId();
         UUID targetId = target == null ? null : target.getUniqueId();
-        UUID previousTargetId = session.dragonNativePhaseTargets.get(dragonId);
-        if (!ArcadePortRules.shouldRefreshDragonPhaseTarget(previousTargetId, targetId, phaseChanged)) return;
-        if (DragonPhaseTargetAccess.setStrafingTarget(dragon, target)) {
+        if (DragonPhaseTargetAccess.setChargeTarget(dragon, target == null ? null : target.getLocation())) {
             session.dragonNativePhaseTargets.put(dragonId, targetId);
         }
     }
@@ -27591,9 +27577,21 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
                     + (stage > 0 ? "Stage " + stage : "Not recorded"));
             if (showStatsPlacementDetails(viewer, "monster-maze") && stage > 0) {
-                int rank = leaderboard == null ? 0
-                        : leaderboard.getKitPatternRank(mode, pattern, targetId, targetName, kit.id);
-                lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + (rank > 0 ? "#" + rank : "Not recorded"));
+                List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
+                        ? List.of() : leaderboard.getKitPatternLeaderboard(mode, pattern, kit.id, 10_000);
+                int rank = 1;
+                boolean found = false;
+                for (var row : rows) {
+                    if (row.name != null && row.name.equalsIgnoreCase(targetName)
+                            && row.kit != null && row.kit.equalsIgnoreCase(kit.id)) {
+                        lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + "#" + rank);
+                        found = true;
+                        break;
+                    }
+                    rank++;
+                }
+                if (!found) lore.add(ChatColor.GOLD + "Placement: " + ChatColor.GRAY
+                        + "Not ranked on this kit's pattern board");
             }
             lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
             inventory.setItem(18 + columns.get(index),
