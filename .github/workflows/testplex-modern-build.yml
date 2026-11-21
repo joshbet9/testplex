@@ -72,6 +72,23 @@ jobs:
       - name: Build shared Arcade mechanics, Snake and Monster Maze modules
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
+      - name: Build shared Arcade core with the modern-session hunger guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress \
+            -f Plugins/pom.xml \
+            -Dmineplex.libs.dir="${GITHUB_WORKSPACE}/libs" \
+            -DskipTests \
+            install
+          test -s Plugins/out/Arcade.jar
+          unzip -tq Plugins/out/Arcade.jar >/dev/null
+          unzip -p Plugins/out/Arcade.jar plugin.yml | grep -Fxq "name: Arcade"
+          jar tf Plugins/out/Arcade.jar | grep -Fxq "nautilus/game/arcade/managers/GameFlagManager.class"
+          grep -Fq 'testplex-modern-arcade-session' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameFlagManager.java
+          mkdir -p modern-platform/target
+          cp Plugins/out/Arcade.jar modern-platform/target/ArcadeCore.jar
+
       - name: Test isolated Fly Monster Maze world provisioning
         run: bash deploy/fly/test-monster-maze-world-provisioning.sh
 
@@ -340,6 +357,10 @@ jobs:
           grep -Fq 'PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"' "$deploy_workflow"
           grep -Fq 'packetevents-spigot-$PE_VERSION.jar' "$deploy_workflow"
           grep -Fq 'PacketEvents.jar' "$deploy_workflow"
+          grep -Fq 'ArcadeCore.jar' "$deploy_workflow"
+          grep -Fq 'Arcade.jar' "$deploy_workflow"
+          grep -Fq 'Arcade.jar' "Dockerfile.fly"
+          grep -Fq 'Arcade.jar' "deploy/fly/entrypoint.sh"
           grep -Fq 'for plugin in TestplexModernArcade ArcadeMechanicsModern FakePlayerPlugin packetevents' "$deploy_workflow"
           grep -Fq 'need_wizards_maps' "$deploy_workflow"
           grep -Fq 'need_mm_maps' "$deploy_workflow"
@@ -419,6 +440,7 @@ jobs:
           path: |
             modern-platform/target/TestplexModernArcade.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
+            modern-platform/target/ArcadeCore.jar
             modern-platform/target/WizardsSourceMaps.tar.gz
           if-no-files-found: error
           retention-days: 14
@@ -431,9 +453,9 @@ jobs:
             echo "## Testplex Modern Paper 26.3"
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
-            echo "- Separate from legacy Java 8 build and deployment"
+            echo "- Builds the shared Java 8 Arcade core so an already-installed legacy core receives the modern-session hunger guard"
             echo "- Catalogue: 30 Arcade selectable IDs (30 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), all enabled across 30 distinct titles"
-            echo "- Built artifacts: TestplexModernArcade.jar and ArcadeMechanicsModern.jar; all games run through the shared Arcade plugin (including Snake, Wizards and Monster Maze)"
+            echo "- Built artifacts: TestplexModernArcade.jar, ArcadeMechanicsModern.jar and ArcadeCore.jar; the legacy core is only refreshed where it is already installed"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: 30 selections enabled across 30 distinct games, including Evolution, Heroes of Gwen Arcade, Hoops Remastered and Wizards Arcade"
