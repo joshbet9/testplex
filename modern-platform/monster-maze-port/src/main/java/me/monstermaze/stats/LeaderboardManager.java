@@ -328,6 +328,37 @@ public class LeaderboardManager {
                 localKitPatternRows(data, mode, pattern, kitId, this::displayName), kitId, pattern, limit);
     }
 
+    /** Rank the viewer's saved kit PB even if Bukkit cannot resolve their offline display name. */
+    public int getKitPatternRank(MazeMode mode, int pattern, UUID playerId, String playerName,
+            String kitId) {
+        if (playerId == null) return 0;
+        int stage = getKitPB(mode, pattern, playerId, kitId);
+        if (stage < 1) return 0;
+        Set<String> ownNames = new HashSet<String>();
+        if (playerName != null && !playerName.isBlank()) ownNames.add(playerName);
+        String storedName = displayName(playerId);
+        if (storedName != null && !storedName.isBlank()) ownNames.add(storedName);
+        return kitPatternRank(getKitPatternLeaderboard(mode, pattern, kitId, Integer.MAX_VALUE),
+                playerName == null || playerName.isBlank() ? storedName : playerName, stage, ownNames);
+    }
+
+    static int kitPatternRank(List<Entry> rows, String playerName, int playerStage,
+            Set<String> knownPlayerNames) {
+        if (playerStage < 1 || playerName == null || playerName.isBlank()) return 0;
+        Set<String> knownNames = knownPlayerNames == null ? Set.of() : knownPlayerNames;
+        int rank = 1;
+        if (rows == null) return rank;
+        for (Entry row : rows) {
+            if (row == null || row.name == null || row.name.isBlank() || row.stage < 1) continue;
+            boolean samePlayer = row.name.equalsIgnoreCase(playerName)
+                    || knownNames.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(row.name));
+            if (samePlayer) continue;
+            if (row.stage > playerStage || row.stage == playerStage
+                    && String.CASE_INSENSITIVE_ORDER.compare(row.name, playerName) < 0) rank++;
+        }
+        return rank;
+    }
+
     /** Merge durable local PBs into the hosted pattern board while remote submission catches up. */
     static List<Entry> mergePatternRows(List<OverallEntry> remoteRows, List<Entry> localRows, int limit) {
         if (limit <= 0) return new ArrayList<Entry>();

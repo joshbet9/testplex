@@ -27591,21 +27591,9 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
                     + (stage > 0 ? "Stage " + stage : "Not recorded"));
             if (showStatsPlacementDetails(viewer, "monster-maze") && stage > 0) {
-                List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
-                        ? List.of() : leaderboard.getKitPatternLeaderboard(mode, pattern, kit.id, 10_000);
-                int rank = 1;
-                boolean found = false;
-                for (var row : rows) {
-                    if (row.name != null && row.name.equalsIgnoreCase(targetName)
-                            && row.kit != null && row.kit.equalsIgnoreCase(kit.id)) {
-                        lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + "#" + rank);
-                        found = true;
-                        break;
-                    }
-                    rank++;
-                }
-                if (!found) lore.add(ChatColor.GOLD + "Placement: " + ChatColor.GRAY
-                        + "Not ranked on this kit's pattern board");
+                int rank = leaderboard == null ? 0
+                        : leaderboard.getKitPatternRank(mode, pattern, targetId, targetName, kit.id);
+                lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + (rank > 0 ? "#" + rank : "Not recorded"));
             }
             lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
             inventory.setItem(18 + columns.get(index),
