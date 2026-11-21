@@ -2592,8 +2592,8 @@ class ArcadePortGameTest {
     }
 
     @Test void dragonsAutonomousFlightUsesNativeMovingPhases() {
-        assertEquals(EnderDragon.Phase.CHARGE_PLAYER, ArcadePortRules.dragonsAutonomousPhase(true));
-        assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
+        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+        assertEquals(EnderDragon.Phase.HOVER, ArcadePortRules.dragonsAutonomousPhase(false));
         assertEquals(0.6D, ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED, 0.00001D);
     }
 

@@ -1774,9 +1774,9 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
-    /** Use native charging flight for selected racer and Sparkler marker targets. */
+    /** Keep native flight attached to the selected living target; never route to the End portal. */
     public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasEntityTarget) {
-        return hasEntityTarget ? EnderDragon.Phase.CHARGE_PLAYER : EnderDragon.Phase.FLY_TO_PORTAL;
+        return hasEntityTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.HOVER;
     }
 
     /** Select racers immediately unless a nearby Sparkler has priority. */

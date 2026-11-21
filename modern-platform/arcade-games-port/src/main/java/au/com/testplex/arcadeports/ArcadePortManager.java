@@ -17009,6 +17009,11 @@ public final class ArcadePortManager implements Listener {
                 session.dragonLastBlockDamageLocation.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
                 session.dragonSparklerTargetByDragon.remove(id);
+                UUID waypointMarkerId = session.dragonWaypointMarkers.remove(id);
+                if (waypointMarkerId != null) {
+                    Entity waypointMarker = session.world.getEntity(waypointMarkerId);
+                    if (waypointMarker != null) waypointMarker.remove();
+                }
                 it.remove();
             }
         }
@@ -17197,30 +17202,28 @@ public final class ArcadePortManager implements Listener {
                 Entity selectedMarker = selectedMarkerId == null ? null : session.world.getEntity(selectedMarkerId);
                 if (selectedPlayer != null && selectedPlayer.isOnline()
                         && session.alive.contains(selectedPlayer.getUniqueId())) {
+                    removeDragonWaypointMarker(session, dragonId);
                     dragon.setTarget(selectedPlayer);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
                     if (dragon.getPhase() != phase) dragon.setPhase(phase);
                 } else if (selectedMarker instanceof org.bukkit.entity.LivingEntity livingMarker
                         && selectedMarker.isValid()) {
-                    // Follow the exact Sparkler position through a non-visible marker
-                    // using native AI; no dragon steering or AI shutdown is involved.
+                    removeDragonWaypointMarker(session, dragonId);
+                    // Paper's strafing phase uses native dragon pathfinding toward living entities.
+                    // This mirrors the source target-entity path without replacing its flight AI.
                     dragon.setTarget(livingMarker);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
                     if (dragon.getPhase() != phase) dragon.setPhase(phase);
                 } else {
-                    dragon.setTarget(null);
                     Location waypoint = session.dragonTargetLocations.get(dragonId);
                     if (waypoint == null) {
                         waypoint = randomDragonSkyTarget(session);
                         session.dragonTargetLocations.put(dragonId, waypoint);
                     }
-                    // Keep autonomous dragons on Paper's native phase-driven flight.
-                    // Direct velocity steering with AI disabled leaves EnderDragons at spawn.
-                    dragon.setPodium(waypoint);
-                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(false);
-                    if (dragon.getPhase() != phase) {
-                        dragon.setPhase(phase);
-                    }
+                    org.bukkit.entity.ArmorStand marker = dragonWaypointMarker(session, dragonId, waypoint);
+                    dragon.setTarget(marker);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                 }
             }
 
@@ -17391,6 +17394,36 @@ public final class ArcadePortManager implements Listener {
             z = maxZ > minZ ? Math.max(minZ, Math.min(maxZ, z)) : mapData.centerZ();
         }
         return new Location(session.world, x, y, z);
+    }
+
+    private org.bukkit.entity.ArmorStand dragonWaypointMarker(Session session, UUID dragonId, Location target) {
+        UUID markerId = session.dragonWaypointMarkers.get(dragonId);
+        Entity existing = markerId == null ? null : session.world.getEntity(markerId);
+        if (existing instanceof org.bukkit.entity.ArmorStand marker && marker.isValid()) {
+            marker.teleport(target);
+            return marker;
+        }
+        org.bukkit.entity.ArmorStand marker = session.world.spawn(target, org.bukkit.entity.ArmorStand.class, stand -> {
+            stand.setMarker(true);
+            stand.setInvisible(true);
+            stand.setInvulnerable(true);
+            stand.setSilent(true);
+            stand.setGravity(false);
+            stand.setCollidable(false);
+            stand.setPersistent(false);
+            stand.setAI(false);
+        });
+        session.dragonWaypointMarkers.put(dragonId, marker.getUniqueId());
+        session.entities.add(marker);
+        return marker;
+    }
+
+    private void removeDragonWaypointMarker(Session session, UUID dragonId) {
+        UUID markerId = session.dragonWaypointMarkers.remove(dragonId);
+        if (markerId == null) return;
+        Entity marker = session.world.getEntity(markerId);
+        if (marker != null) marker.remove();
+        session.entities.removeIf(entity -> markerId.equals(entity.getUniqueId()));
     }
 
     private void setDragonTargetSky(Session session, EnderDragon dragon) {
@@ -29794,7 +29827,9 @@ public final class ArcadePortManager implements Listener {
                             session.dragonTamerByDragon.containsKey(dragonId));
             boolean selectedSparkler = requested instanceof org.bukkit.entity.ArmorStand
                     && requested.getUniqueId().equals(session.dragonSparklerTargetByDragon.get(dragonId));
-            if (!selectedPlayer && !selectedSparkler) event.setCancelled(true);
+            boolean selectedWaypoint = requested instanceof org.bukkit.entity.ArmorStand
+                    && requested.getUniqueId().equals(session.dragonWaypointMarkers.get(dragonId));
+            if (!selectedPlayer && !selectedSparkler && !selectedWaypoint) event.setCancelled(true);
         }
     }
 
