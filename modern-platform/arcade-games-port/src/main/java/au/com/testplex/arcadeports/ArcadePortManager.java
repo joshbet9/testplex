@@ -27592,7 +27592,7 @@ public final class ArcadePortManager implements Listener {
                     + (stage > 0 ? "Stage " + stage : "Not recorded"));
             if (showStatsPlacementDetails(viewer, "monster-maze") && stage > 0) {
                 List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
-                        ? List.of() : leaderboard.getLeaderboard(mode, pattern, 10_000);
+                        ? List.of() : leaderboard.getKitPatternLeaderboard(mode, pattern, kit.id, 10_000);
                 int rank = 1;
                 boolean found = false;
                 for (var row : rows) {
@@ -27605,7 +27605,7 @@ public final class ArcadePortManager implements Listener {
                     rank++;
                 }
                 if (!found) lore.add(ChatColor.GOLD + "Placement: " + ChatColor.GRAY
-                        + "Not in the best-kit pattern board");
+                        + "Not ranked on this kit's pattern board");
             }
             lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
             inventory.setItem(18 + columns.get(index),

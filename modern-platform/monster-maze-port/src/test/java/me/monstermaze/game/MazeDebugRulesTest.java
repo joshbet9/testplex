@@ -9,11 +9,14 @@ import org.junit.jupiter.api.Test;
 
 class MazeDebugRulesTest {
     @Test void mobMovementSpeedDefaultsToSourceAndDebugOverrideIsConsumed() {
-        assertEquals(1.0F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_MODERN_MOB_MOVE_SPEED", 1.9D));
-        assertEquals(1.9F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.35F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
+        GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_MODERN_MOB_MOVE_SPEED", 1.6D));
+        assertEquals(1.6F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.7F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
         GameDebugRuntimeOverrides.clear();
-        assertEquals(1.0F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(0.35F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
     }
 
     @Test void playerPersonalBestsPersistEvenDuringDebugRoundsButNeverForSyntheticPlayers() {

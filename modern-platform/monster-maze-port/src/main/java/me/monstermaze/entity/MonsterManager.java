@@ -265,7 +265,7 @@ public class MonsterManager {
                 else if (west != null && nextLoc.equals(west.getLocation())) wp.Direction = CardinalDirection.WEST;
             }
 
-            UtilEnt.CreatureMoveFast(ent, wp.Target, MazeDebugRules.mobMoveSpeed(game.getMode()));
+            UtilEnt.CreatureMoveFast(ent, wp.Target, MazeDebugRules.mobPathfinderSpeed(game.getMode()));
         }
     }
 

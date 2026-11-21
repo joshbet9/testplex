@@ -92,4 +92,31 @@ class LeaderboardManagerKitLeaderboardTest {
         assertFalse(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 0, player, "jumper", 10));
         assertEquals(12, LeaderboardManager.storedKitPB(records, MazeMode.MODERN, 0, player, "jumper"));
     }
+
+    @Test
+    void kitPatternBoardRanksEachKitsRecordEvenWhenAnotherKitIsThePlayersOverallBest() {
+        YamlConfiguration records = new YamlConfiguration();
+        UUID alice = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        assertTrue(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 1, alice, "body-builder", 24));
+        assertTrue(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 1, alice, "jumper", 11));
+        assertTrue(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 1, bob, "jumper", 13));
+
+        List<LeaderboardManager.Entry> local = LeaderboardManager.localKitPatternRows(
+                records, MazeMode.MODERN, 1, "jumper",
+                player -> player.equals(alice) ? "Alice" : "Bob");
+        List<LeaderboardManager.Entry> ranked = LeaderboardManager.mergeKitPatternRows(
+                List.of(new LeaderboardManager.OverallEntry("Cara", 12, "jumper", 1),
+                        new LeaderboardManager.OverallEntry("Alice", 24, "body-builder", 1)),
+                local, "jumper", 1, 10);
+
+        assertEquals(3, ranked.size());
+        assertEquals("Bob", ranked.get(0).name);
+        assertEquals(13, ranked.get(0).stage);
+        assertEquals("Cara", ranked.get(1).name);
+        assertEquals(12, ranked.get(1).stage);
+        assertEquals("Alice", ranked.get(2).name);
+        assertEquals(11, ranked.get(2).stage);
+        assertEquals(1, LeaderboardManager.mergeKitPatternRows(null, local, "jumper", 1, 1).size());
+    }
 }
