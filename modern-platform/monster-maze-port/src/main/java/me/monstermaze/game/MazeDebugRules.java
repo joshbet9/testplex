@@ -85,25 +85,23 @@ public final class MazeDebugRules {
         return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
     }
 
-    /** Original Mineplex bump trajectory: from the mob's position toward the player in 3D. */
+    /** Original Mineplex bump direction is horizontal; vertical lift comes only from the configured impulse. */
     public static Vector sourceMobBumpTrajectory(Location monster, Location player) {
         if (monster == null || player == null) return new Vector();
-        return player.toVector().subtract(monster.toVector());
+        Vector direction = player.toVector().subtract(monster.toVector());
+        direction.setY(0.0D);
+        if (direction.lengthSquared() <= 1.0E-6D) return new Vector(1.0D, 0.0D, 0.0D);
+        return direction;
     }
 
     public static boolean isBumpHitWithinRange(MazeMode mode, double horizontalDistanceSquared,
             double distanceSquared) {
         double radius = Math.max(0.1D, doubleValue(mode, "BUMP_RADIUS_BLOCKS", BUMP_RADIUS_BLOCKS));
         double radiusSquared = radius * radius;
-        // Mob and player feet can be at different Y levels while their hitboxes
-        // still overlap (e.g. after a launch or jump). A spherical feet-to-feet
-        // check silently misses those contacts. Keep the configured horizontal
-        // range, but permit vertical overlap with the source mob hitbox.
-        double verticalDistanceSquared = distanceSquared - horizontalDistanceSquared;
+        // Mineplex used a 3D feet-to-feet distance check for mob contact.
         return Double.isFinite(horizontalDistanceSquared) && Double.isFinite(distanceSquared)
-                && horizontalDistanceSquared >= 0.0D && verticalDistanceSquared >= 0.0D
-                && horizontalDistanceSquared < radiusSquared
-                && verticalDistanceSquared < 1.9D * 1.9D;
+                && horizontalDistanceSquared >= 0.0D && distanceSquared >= horizontalDistanceSquared
+                && distanceSquared < radiusSquared;
     }
 
     public static boolean isBumpCooldownReady(MazeMode mode, long nowMillis, long lastBumpMillis) {
