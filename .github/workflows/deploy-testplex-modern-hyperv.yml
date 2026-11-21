@@ -267,6 +267,32 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          arcade_core_required="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_ARCADE_CORE_CHECK'
+          set -euo pipefail
+          installed=/home/monstermaze/servers/testplex-modern/plugins/Arcade.jar
+          if sudo -n test -f "$installed"; then
+            descriptor="$(sudo -n unzip -p "$installed" plugin.yml 2>/dev/null || true)"
+            name="$(printf '%s\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
+            [[ "$name" == Arcade ]] && echo true || echo false
+          else
+            echo false
+          fi
+          REMOTE_ARCADE_CORE_CHECK
+          )"
+          [[ "$arcade_core_required" == true || "$arcade_core_required" == false ]] || {
+            echo "Remote optional Arcade core check returned an invalid result." >&2
+            exit 1
+          }
+          if [[ "$arcade_core_required" == true ]]; then
+            arcade_core="$(find "$source_dir" -type f -name ArcadeCore.jar -print -quit)"
+            [[ -s "$arcade_core" ]] || { echo "The build artifact is missing ArcadeCore.jar required by the installed Arcade plugin." >&2; exit 1; }
+            unzip -p "$arcade_core" plugin.yml | grep -Fxq "name: Arcade" || {
+              echo "Packaged Arcade core has an unexpected plugin descriptor." >&2
+              exit 1
+            }
+            cp "$arcade_core" "$stage_dir/ArcadeCore.jar"
+          fi
+          echo "arcade_core_required=$arcade_core_required" >> "$GITHUB_OUTPUT"
           wizards_maps_sha="$(sha256sum "$maps_archive" | awk '{print $1}')"
           printf '%s\n' "$wizards_maps_sha" > "$stage_dir/WizardsSourceMaps.sha256"
           need_wizards_maps="$(timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$wizards_maps_sha" <<'REMOTE_WIZARDS_CACHE_CHECK'
@@ -384,6 +410,7 @@ jobs:
           done
           printf '%s\n' "${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
           checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh" "$STAGE_DIR/testplex-map-archive.py" "$STAGE_DIR/testplex-jar-delta.py")
+          [[ ! -f "$STAGE_DIR/ArcadeCore.jar" ]] || checksum_files+=("$STAGE_DIR/ArcadeCore.jar")
           [[ ! -f "$STAGE_DIR/WizardsSourceMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/WizardsSourceMaps.tar.gz")
           shopt -s nullglob
           delta_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
@@ -669,6 +696,7 @@ jobs:
               [[ -n "$jar" ]] || continue
               [[ -s "$STAGE_DIR/$jar.delta.zip" && -s "$STAGE_DIR/$jar.delta.json" ]] || { echo "Missing verified delta files for $jar." >&2; exit 1; }
             done < "$STAGE_DIR/ChangedModernJars.txt"
+            [[ ! -s "$STAGE_DIR/ArcadeCore.jar" ]] || printf 'put "%s" "%s"\n' "$STAGE_DIR/ArcadeCore.jar" "ArcadeCore.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-jar-delta.py" "testplex-jar-delta.py"
             for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
@@ -753,6 +781,7 @@ jobs:
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
+          ARCADE_CORE_REQUIRED: ${{ steps.stage-jars.outputs.arcade_core_required }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
         run: |
@@ -766,7 +795,7 @@ jobs:
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
           echo "[deploy] opening an exclusive remote deployment lock."
           deploy_exit=0
-          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" "$ARCADE_CORE_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
           set -Eeuo pipefail
           DEPLOY_PHASE="bootstrap"
           trap 'rc=$?; printf "[deploy] remote script failed in phase=%s at line=%s (status=%s)\n" "${DEPLOY_PHASE:-unknown}" "${BASH_LINENO[0]:-unknown}" "$rc" >&2' ERR
@@ -775,6 +804,7 @@ jobs:
           ACCEPT_EULA="$3"
           MM_MAPS_REQUIRED="$4"
           WIZARDS_MAPS_REQUIRED="$5"
+          ARCADE_CORE_REQUIRED="$6"
           SERVER_DIR="/home/monstermaze/servers/testplex-modern"
           JAVA_HOME="/opt/testplex/java25"
           JAVA_BIN="$JAVA_HOME/bin/java"
@@ -796,6 +826,13 @@ jobs:
           sudo -n test -s "$UPLOAD_DIR/testplex-map-archive.py"
           sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
           sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.sha256"
+          if [[ "$ARCADE_CORE_REQUIRED" == true ]]; then
+            sudo -n test -s "$UPLOAD_DIR/ArcadeCore.jar"
+            sudo -n unzip -p "$UPLOAD_DIR/ArcadeCore.jar" plugin.yml | grep -Fxq "name: Arcade"
+          elif [[ "$ARCADE_CORE_REQUIRED" != false || -e "$UPLOAD_DIR/ArcadeCore.jar" ]]; then
+            echo "Invalid optional Arcade core payload state; refusing deployment." >&2
+            exit 1
+          fi
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             # The pinned map source is fetched from GitHub during the pre-install
             # assembly phase, then checksum-validated and checked for all seven worlds.
