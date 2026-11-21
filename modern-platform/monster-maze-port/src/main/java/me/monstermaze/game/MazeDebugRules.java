@@ -7,7 +7,10 @@ import org.bukkit.util.Vector;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
-    public static final float MOB_MOVE_SPEED = 1.4F;
+    // Match the speed that the previous controller applied near waypoints. Keeping
+    // this constant across the whole segment prevents long straights from running
+    // at the faster 1.4 multiplier while corners were clamped to 1.0.
+    public static final float MOB_MOVE_SPEED = 1.0F;
     public static final int STAGE_TIMER_INITIAL_SECONDS = 60;
     public static final double STAGE_TIMER_DECREASE_PER_STAGE_SECONDS = 2.0D;
     public static final int STAGE_TIMER_MIN_SECONDS = 15;
@@ -80,9 +83,19 @@ public final class MazeDebugRules {
         return GameDebugRuntimeOverrides.doubleValue(key(mode, field), fallback);
     }
 
-    /** Original Monster Maze waypoint speed, still tunable by authorised debug profiles. */
+    /** Uniform waypoint path speed, still tunable by authorised debug profiles. */
     public static float mobMoveSpeed(MazeMode mode) {
         return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
+    }
+
+    /** Test runs still persist PBs; only synthetic test accounts are excluded. */
+    public static boolean shouldPersistPlayerPB(boolean hasPlayer, boolean isSyntheticTestPlayer) {
+        return hasPlayer && !isSyntheticTestPlayer;
+    }
+
+    /** Testplex retains test records locally; production backend writes remain separately gated. */
+    public static boolean shouldRecordRuns(boolean testMode, boolean configured) {
+        return testMode || configured;
     }
 
     /** Original Mineplex bump direction is horizontal; vertical lift comes only from the configured impulse. */

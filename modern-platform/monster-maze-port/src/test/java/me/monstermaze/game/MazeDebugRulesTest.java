@@ -9,11 +9,24 @@ import org.junit.jupiter.api.Test;
 
 class MazeDebugRulesTest {
     @Test void mobMovementSpeedDefaultsToSourceAndDebugOverrideIsConsumed() {
-        assertEquals(1.4F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(1.0F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
         GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_MODERN_MOB_MOVE_SPEED", 1.9D));
         assertEquals(1.9F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
         GameDebugRuntimeOverrides.clear();
-        assertEquals(1.4F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+        assertEquals(1.0F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
+    }
+
+    @Test void playerPersonalBestsPersistEvenDuringDebugRoundsButNeverForSyntheticPlayers() {
+        assertTrue(MazeDebugRules.shouldPersistPlayerPB(true, false));
+        assertFalse(MazeDebugRules.shouldPersistPlayerPB(true, true));
+        assertFalse(MazeDebugRules.shouldPersistPlayerPB(false, false));
+    }
+
+    @Test void testModeForcesLocalRunRecordingEvenWhenAnOldConfigDisabledIt() {
+        assertTrue(MazeDebugRules.shouldRecordRuns(true, false));
+        assertTrue(MazeDebugRules.shouldRecordRuns(true, true));
+        assertFalse(MazeDebugRules.shouldRecordRuns(false, false));
+        assertTrue(MazeDebugRules.shouldRecordRuns(false, true));
     }
 
     @Test void mobBumpDirectionMatchesSourceAndDoesNotAddVerticalLaunchFromHeightOffset() {

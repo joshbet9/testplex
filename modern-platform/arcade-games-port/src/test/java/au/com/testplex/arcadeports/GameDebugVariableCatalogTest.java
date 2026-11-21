@@ -987,10 +987,10 @@ class GameDebugVariableCatalogTest {
                 me.monstermaze.game.MazeMode.ORIGINAL, "CRYO_RADIUS_BLOCKS", 6));
         assertEquals(9, me.monstermaze.game.MazeDebugRules.intValue(
                 me.monstermaze.game.MazeMode.MODERN, "CRYO_RADIUS_BLOCKS", 6));
-        assertEquals(0.8F, me.monstermaze.game.MazeDebugRules.floatValue(
-                me.monstermaze.game.MazeMode.ORIGINAL, "MOB_MOVE_SPEED", 0.8F));
+        assertEquals(1.0F, me.monstermaze.game.MazeDebugRules.floatValue(
+                me.monstermaze.game.MazeMode.ORIGINAL, "MOB_MOVE_SPEED", 1.0F));
         assertEquals(1.2F, me.monstermaze.game.MazeDebugRules.floatValue(
-                me.monstermaze.game.MazeMode.SPEED, "MOB_MOVE_SPEED", 0.8F));
+                me.monstermaze.game.MazeMode.SPEED, "MOB_MOVE_SPEED", 1.0F));
     }
 
     private static void assertContains(List<GameDebugVariableCatalog.Variable> variables, String key) {
