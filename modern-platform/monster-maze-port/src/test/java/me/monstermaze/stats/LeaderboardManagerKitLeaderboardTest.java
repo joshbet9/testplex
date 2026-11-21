@@ -45,6 +45,28 @@ class LeaderboardManagerKitLeaderboardTest {
     }
 
     @Test
+    void mergesLocalPatternRecordsIntoHostedBoardAndKeepsEachPlayersBestStage() {
+        List<LeaderboardManager.OverallEntry> remote = List.of(
+                new LeaderboardManager.OverallEntry("Alice", 8, "jumper", 0),
+                new LeaderboardManager.OverallEntry("Bob", 9, "frosty", 0));
+        List<LeaderboardManager.Entry> local = List.of(
+                new LeaderboardManager.Entry("alice", 10, "jumper"),
+                new LeaderboardManager.Entry("Bob", 7, "jumper"),
+                new LeaderboardManager.Entry("Cara", 6, "repulsor"));
+
+        List<LeaderboardManager.Entry> ranked = LeaderboardManager.mergePatternRows(remote, local, 10);
+
+        assertEquals(3, ranked.size());
+        assertEquals("alice", ranked.get(0).name);
+        assertEquals(10, ranked.get(0).stage);
+        assertEquals("Bob", ranked.get(1).name);
+        assertEquals(9, ranked.get(1).stage);
+        assertEquals("Cara", ranked.get(2).name);
+        assertEquals(6, ranked.get(2).stage);
+        assertEquals(1, LeaderboardManager.mergePatternRows(remote, local, 1).size());
+    }
+
+    @Test
     void retainsKitBestPerPatternAndDoesNotLetOneMazeOverwriteAnother() {
         YamlConfiguration records = new YamlConfiguration();
         UUID player = UUID.randomUUID();
