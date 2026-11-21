@@ -358,7 +358,7 @@ jobs:
           echo "mm_maps_required=$need_mm_maps" >> "$GITHUB_OUTPUT"
           echo "wizards_maps_required=$need_wizards_maps" >> "$GITHUB_OUTPUT"
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
-          echo "Verified four Testplex Modern JARs ($SOURCE_SHA), with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
+          echo "Verified modern plugin JARs ($SOURCE_SHA), optional existing Arcade core=$arcade_core_required, with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
 
       - name: Create verified JAR deltas against the deployed build
         id: jar-diff
@@ -1175,6 +1175,17 @@ jobs:
             [[ -n "$jar" ]] || continue
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
+          if [[ "$ARCADE_CORE_REQUIRED" == true ]]; then
+            existing_arcade="$SERVER_DIR/plugins/Arcade.jar"
+            existing_name="$(sudo -n unzip -p "$existing_arcade" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
+            [[ "$existing_name" == Arcade ]] || {
+              echo "Previously detected Arcade core disappeared or changed identity; rolling back." >&2
+              rollback
+              exit 1
+            }
+            sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/ArcadeCore.jar" "$existing_arcade"
+            echo "Refreshed the pre-existing Arcade core with the shared-session hunger guard."
+          fi
 
           # Retire any previously installed FakePlayerPlugin version by descriptor,
           # not filename. The existing pre-deployment plugins snapshot preserves the
@@ -1576,6 +1587,23 @@ jobs:
             timeout --foreground --signal=TERM 8s df -h "$SERVER_DIR" /var/tmp >&2 || true
             rollback
             exit 1
+          fi
+
+          if [[ "$ARCADE_CORE_REQUIRED" == true ]]; then
+            installed_name="$(sudo -n unzip -p "$SERVER_DIR/plugins/Arcade.jar" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
+            [[ "$installed_name" == Arcade ]] || {
+              echo "The refreshed legacy Arcade core is not present after Paper startup." >&2
+              rollback
+              exit 1
+            }
+            installed_sha="$(sudo -n sha256sum "$SERVER_DIR/plugins/Arcade.jar" | awk '{print $1}')"
+            target_sha="$(sudo -n sha256sum "$UPLOAD_DIR/ArcadeCore.jar" | awk '{print $1}')"
+            [[ "$installed_sha" == "$target_sha" ]] || {
+              echo "The installed legacy Arcade core does not match the verified hunger-guard build." >&2
+              rollback
+              exit 1
+            }
+            echo "HYPERV_ARCADE_CORE_VERIFIED:$installed_sha"
           fi
 
           if ! sudo -n grep -Fqi '[packetevents] Enabling packetevents v2.14.0' "$SERVER_DIR/logs/latest.log"; then
