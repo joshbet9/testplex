@@ -4727,6 +4727,18 @@ public final class ArcadePortRules {
         return bestIndex;
     }
 
+    /** Mirrors the original Death Tag compass action bar shown while holding the compass. */
+    public static String deathTagCompassActionBar(String targetName, boolean targetIsChaser,
+            double distance, double height) {
+        ChatColor targetColor = targetIsChaser ? ChatColor.RED : ChatColor.GREEN;
+        String name = targetName == null ? "" : targetName;
+        String distanceText = String.format(java.util.Locale.ROOT, "%.1f", Double.isFinite(distance) ? distance : 0.0D);
+        String heightText = String.format(java.util.Locale.ROOT, "%.1f", Double.isFinite(height) ? height : 0.0D);
+        return "    " + ChatColor.WHITE + ChatColor.BOLD + "Nearest Target: " + targetColor + name
+                + "    " + ChatColor.WHITE + ChatColor.BOLD + "Distance: " + targetColor + distanceText
+                + "    " + ChatColor.WHITE + ChatColor.BOLD + "Height: " + targetColor + heightText;
+    }
+
     /** Source DeathTag.GetKillsGems pays for a Runner kill, never for a Chaser kill. */
     public static int deathTagKillRewardGems(boolean killedRunner) {
         return killedRunner ? Math.max(0, GameDebugRuntimeOverrides.intValue(

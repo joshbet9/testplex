@@ -15,6 +15,19 @@ class DeathTagDebugRulesTest {
     }
 
     @Test
+    void compassActionBarMatchesSourceLabelsSpacingPrecisionAndTargetTeamColour() {
+        assertEquals("    " + org.bukkit.ChatColor.WHITE + org.bukkit.ChatColor.BOLD + "Nearest Target: "
+                        + org.bukkit.ChatColor.RED + "ChaserOne"
+                        + "    " + org.bukkit.ChatColor.WHITE + org.bukkit.ChatColor.BOLD + "Distance: "
+                        + org.bukkit.ChatColor.RED + "12.3"
+                        + "    " + org.bukkit.ChatColor.WHITE + org.bukkit.ChatColor.BOLD + "Height: "
+                        + org.bukkit.ChatColor.RED + "-4.6",
+                ArcadePortRules.deathTagCompassActionBar("ChaserOne", true, 12.34D, -4.56D));
+        assertTrue(ArcadePortRules.deathTagCompassActionBar("RunnerTwo", false, 0.0D, 2.0D)
+                .contains(org.bukkit.ChatColor.GREEN + "RunnerTwo"));
+    }
+
+    @Test
     void turtleAndTricksterTuningChangesAbilitiesAndResetsToSourceDefaults() {
         assertEquals(5_000L, ArcadePortRules.deathTagTurtleStackResetMillis());
         assertEquals(3, ArcadePortRules.deathTagTurtleMaxStacks());
