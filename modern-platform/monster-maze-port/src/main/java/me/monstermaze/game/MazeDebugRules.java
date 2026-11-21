@@ -97,7 +97,7 @@ public final class MazeDebugRules {
         double radiusSquared = radius * radius;
         // Mineplex used a 3D feet-to-feet distance check for mob contact.
         return Double.isFinite(horizontalDistanceSquared) && Double.isFinite(distanceSquared)
-                && horizontalDistanceSquared >= 0.0D && distanceSquared >= 0.0D
+                && horizontalDistanceSquared >= 0.0D && distanceSquared >= horizontalDistanceSquared
                 && distanceSquared < radiusSquared;
     }
 
