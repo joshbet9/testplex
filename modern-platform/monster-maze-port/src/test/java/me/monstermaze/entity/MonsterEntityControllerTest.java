@@ -2,14 +2,43 @@ package me.monstermaze.entity;
 
 import org.bukkit.World;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MonsterEntityControllerTest {
+    @Test
+    void nativeNavigationIsReenabledOnEachControllerUpdate() {
+        AtomicBoolean aware = new AtomicBoolean(false);
+        AtomicBoolean ai = new AtomicBoolean(false);
+        Mob mob = (Mob) Proxy.newProxyInstance(Mob.class.getClassLoader(), new Class<?>[]{Mob.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("setAware")) {
+                        aware.set((Boolean) args[0]);
+                        return null;
+                    }
+                    if (method.getName().equals("isAware")) return aware.get();
+                    if (method.getName().equals("setAI")) {
+                        ai.set((Boolean) args[0]);
+                        return null;
+                    }
+                    if (method.getName().equals("hasAI")) return ai.get();
+                    if (method.getName().equals("equals")) return proxy == args[0];
+                    if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
+                    return primitiveDefault(method.getReturnType());
+                });
+
+        MonsterEntityController.enableNativeNavigation(mob);
+
+        assertTrue(ai.get());
+        assertTrue(aware.get(), "tick updates must not disable Paper waypoint navigation");
+    }
+
     @Test
     void forgetRemovesSkinAndStrongEntityReference() {
         UUID id = UUID.randomUUID();

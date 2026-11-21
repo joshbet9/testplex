@@ -50,9 +50,7 @@ public final class MonsterEntityController {
 
         if (entity instanceof Mob) {
             Mob mob = (Mob) entity;
-            mob.setAI(true);
-            // Native PathFinder movement requires awareness; all vanilla goals are removed separately.
-            mob.setAware(true);
+            enableNativeNavigation(mob);
         }
         setMovementSpeed(entity);
         normalizeHitbox(entity);
@@ -102,11 +100,16 @@ public final class MonsterEntityController {
         entity.setVisualFire(false);
         if (entity instanceof Mob) {
             Mob mob = (Mob) entity;
-            mob.setAI(true);
-            mob.setAware(false);
+            enableNativeNavigation(mob);
         }
         setMovementSpeed(entity);
         normalizeHitbox(entity);
+    }
+
+    /** The waypoint navigator needs mob awareness on every controller update. */
+    static void enableNativeNavigation(Mob mob) {
+        mob.setAI(true);
+        mob.setAware(true);
     }
 
     private static void tag(LivingEntity entity) {
