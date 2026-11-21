@@ -153,6 +153,12 @@ jobs:
           tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz >/dev/null
           sha256sum modern-platform/target/WizardsSourceMaps.tar.gz
 
+      - name: Set up Java 8 for the original Arcade core
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
       - name: Build shared Arcade core with the modern-session hunger guard
         shell: bash
         run: |
