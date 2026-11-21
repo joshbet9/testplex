@@ -8,7 +8,6 @@ import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.game.GameState;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.game.SafePad;
-import me.monstermaze.kit.KitType;
 import me.monstermaze.maze.MazeGenerator;
 import me.monstermaze.util.UtilAction;
 import me.monstermaze.util.UtilEnt;
@@ -266,8 +265,7 @@ public class MonsterManager {
                 else if (west != null && nextLoc.equals(west.getLocation())) wp.Direction = CardinalDirection.WEST;
             }
 
-            UtilEnt.CreatureMoveFast(ent, wp.Target, MazeDebugRules.floatValue(
-                    game.getMode(), "MOB_MOVE_SPEED", MazeDebugRules.MOB_MOVE_SPEED));
+            UtilEnt.CreatureMoveFast(ent, wp.Target, MazeDebugRules.mobMoveSpeed(game.getMode()));
         }
     }
 
@@ -353,17 +351,12 @@ public class MonsterManager {
                     player.teleport(up);
                 }
 
-                if (game.qolEnabled()) applyQolKnockback(player, ent);
-                else {
-                    Vector away = player.getLocation().toVector().subtract(ent.getLocation().toVector());
-                    away.setY(0);
-                    if (away.lengthSquared() <= 1e-6) away = new Vector(1, 0, 0);
-                    UtilAction.velocity(player, away.normalize(),
-                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
-                            false, 0,
-                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
-                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
-                }
+                Vector sourceTrajectory = MazeDebugRules.sourceMobBumpTrajectory(ent.getLocation(), player.getLocation());
+                UtilAction.velocity(player, sourceTrajectory,
+                        MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
+                        false, 0,
+                        MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
+                        MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
 
                 double bumpDamage = MazeDebugRules.bumpDamage(game.getMode());
                 applyMobContactDamage(player, ent, bumpDamage);
@@ -371,36 +364,6 @@ public class MonsterManager {
                 break;
             }
         }
-    }
-
-    private Vector applyQolKnockback(Player player, LivingEntity ent) {
-        Vector dir = null;
-        if (game.getKitManager().getKit(player) == KitType.MAVERICK
-                && MazeDebugRules.kitEnabled(player.getUniqueId(), "maverick")) {
-            Location target = game.getMobKnockTarget();
-            if (target != null) {
-                dir = target.toVector().subtract(player.getLocation().toVector());
-                dir.setY(0);
-                if (dir.lengthSquared() > 1e-6) dir.normalize();
-                else dir = null;
-            }
-        }
-        if (dir == null) {
-            dir = player.getLocation().toVector().subtract(ent.getLocation().toVector());
-            dir.setY(0);
-            if (dir.lengthSquared() <= 1e-6) {
-                dir = player.getLocation().getDirection().multiply(-1);
-                dir.setY(0);
-                if (dir.lengthSquared() <= 1e-6) dir = new Vector(1, 0, 0);
-            }
-        }
-        Vector out = dir.normalize();
-        UtilAction.velocity(player, out,
-                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
-                false, 0,
-                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
-                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
-        return out;
     }
 
     /**
