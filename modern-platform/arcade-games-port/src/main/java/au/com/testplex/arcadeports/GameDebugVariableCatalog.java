@@ -86,6 +86,7 @@ final class GameDebugVariableCatalog {
             "SPLEEF_BRAWLER_KNOCKBACK", "SPLEEF_DEFAULT_KNOCKBACK", "SPLEEF_KNOCKBACK_COOLDOWN_MILLIS",
             "SPLEEF_KNOCKBACK_VERTICAL_BASE", "SPLEEF_KNOCKBACK_GROUND_BONUS",
             "SPLEEF_KNOCKBACK_VERTICAL_CAP", "SPLEEF_GUST_COOLDOWN_MILLIS", "SPLEEF_GUST_SPEED_MULTIPLIER",
+            "SPLEEF_GUST_RADIUS_BLOCKS", "SPLEEF_GUST_POWER", "SPLEEF_GUST_VERTICAL_BOOST",
             "SPLEEF_SMASHER_COOLDOWN_MILLIS", "SPLEEF_SMASHER_RADIUS_BLOCKS",
             "SPLEEF_LEAP_FORWARD_POWER", "SPLEEF_LEAP_VERTICAL_ADD", "SPLEEF_LEAP_VERTICAL_CAP",
             "SPLEEF_LEAP_GROUND_BONUS", "SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS",
@@ -578,6 +579,7 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("HOOPS_SHOT_") && (name.endsWith("_MIN_FLIGHT_TICKS")
                 || name.endsWith("_MAX_FLIGHT_TICKS"))) return 1.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 0.0D;
+        if (name.equals("SPLEEF_GUST_RADIUS_BLOCKS")) return 1.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 0.0D;
@@ -835,6 +837,9 @@ final class GameDebugVariableCatalog {
                 || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL")) return 2.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_KNOCKBACK_MULTIPLIER")) return 3.0D;
         if (name.equals("SPLEEF_KNOCKBACK_VERTICAL_CAP")) return 12.0D;
+        if (name.equals("SPLEEF_GUST_RADIUS_BLOCKS")) return 8.0D;
+        if (name.equals("SPLEEF_GUST_POWER")) return 5.0D;
+        if (name.equals("SPLEEF_GUST_VERTICAL_BOOST")) return 4.0D;
         if (name.contains("_KNOCKBACK")) return 8.0D;
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;

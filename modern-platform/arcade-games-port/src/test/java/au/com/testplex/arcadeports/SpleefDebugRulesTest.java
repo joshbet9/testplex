@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,41 @@ class SpleefDebugRulesTest {
     }
 
     @Test
+    void gustLaunchHasAnUpwardRecoveryImpulseAndArrowsOnlyRemoveTilesActuallyInTheirImpactRadius() {
+        assertEquals(4.0D, ArcadePortRules.spleefGustRadiusBlocks());
+        org.bukkit.util.Vector selfImpulse = ArcadePortRules.spleefGustVelocity(new org.bukkit.util.Vector());
+        assertEquals(0.0D, selfImpulse.getX(), 1.0E-6D);
+        assertEquals(ArcadePortRules.SPLEEF_GUST_POWER, selfImpulse.getY(), 1.0E-6D);
+        org.bukkit.util.Vector nearbyImpulse = ArcadePortRules.spleefGustVelocity(
+                new org.bukkit.util.Vector(2.0D, 0.0D, 0.0D));
+        assertTrue(nearbyImpulse.getX() > 0.0D);
+        assertTrue(nearbyImpulse.getY() > 0.0D);
+        assertEquals(0.0D, ArcadePortRules.spleefGustVelocity(
+                new org.bukkit.util.Vector(ArcadePortRules.SPLEEF_GUST_RADIUS_BLOCKS, 0.0D, 0.0D))
+                .lengthSquared(), 1.0E-6D);
+
+        assertTrue(ArcadePortRules.spleefArrowClearsOffset(0, 0, 0, 1.5D));
+        assertTrue(ArcadePortRules.spleefArrowClearsOffset(1, 0, 0, 1.5D));
+        assertFalse(ArcadePortRules.spleefArrowClearsOffset(2, 0, 0, 1.5D));
+        assertTrue(ArcadePortRules.spleefArrowBreaksPlayerFloor(0, 63, 0, 1, 64, 0, 1.5D));
+        assertFalse(ArcadePortRules.spleefArrowBreaksPlayerFloor(0, 63, 0, 2, 64, 0, 1.5D));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SPLEEF_GUST_RADIUS_BLOCKS", 6.0D,
+                "SPLEEF_GUST_POWER", 2.0D,
+                "SPLEEF_GUST_VERTICAL_BOOST", 1.0D));
+        assertEquals(6.0D, ArcadePortRules.spleefGustRadiusBlocks());
+        org.bukkit.util.Vector tuned = ArcadePortRules.spleefGustVelocity(
+                new org.bukkit.util.Vector(3.0D, 0.0D, 0.0D));
+        assertEquals(1.0D, tuned.getX(), 1.0E-6D);
+        assertEquals(0.5D, tuned.getY(), 1.0E-6D);
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(4.0D, ArcadePortRules.spleefGustRadiusBlocks());
+        assertEquals(ArcadePortRules.SPLEEF_GUST_POWER,
+                ArcadePortRules.spleefGustVelocity(new org.bukkit.util.Vector()).getY(), 1.0E-6D);
+    }
+
+    @Test
     void allAdditionalSpleefSlidersHaveBoundedRangesAndAccurateImmediateMetadata() {
         assertRange("SPLEEF_HUNGER_RESTORE_PER_HIT", 0.0D, 20.0D);
         assertRange("SPLEEF_LEAP_FORWARD_POWER", 0.0D, 5.0D);
@@ -95,6 +131,9 @@ class SpleefDebugRulesTest {
         assertRange("SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR", 0.1D, 10.0D);
         assertRange("SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS", 0.0D, 4.0D);
         assertRange("SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER", 0.1D, 4.0D);
+        assertRange("SPLEEF_GUST_RADIUS_BLOCKS", 1.0D, 8.0D);
+        assertRange("SPLEEF_GUST_POWER", 0.0D, 5.0D);
+        assertRange("SPLEEF_GUST_VERTICAL_BOOST", 0.0D, 4.0D);
         assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
                 ArcadePortGame.SPLEEF, "SPLEEF_LEAP_FORWARD_POWER")));
     }
