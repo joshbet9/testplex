@@ -31287,6 +31287,17 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getEntity() instanceof Arrow turfArrow
                 && session.turfTrackedArrows.remove(turfArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player target
+                    && turfArrow.getShooter() instanceof Player shooter
+                    && TurfWarsProjectileImpactRules.shouldApplyFallback(
+                            event.getHitEntity() instanceof Player,
+                            turfArrow.getShooter() instanceof Player)) {
+                // Normally onEntityDamageByEntity has already routed this arrow through the
+                // regular PvP handler and removed it from turfTrackedArrows. If Paper reports
+                // the impact without delivering a damage event (as can happen with test-player
+                // implementations), preserve the same hit, knockback, and kill-credit behavior.
+                handlePlayerHit(session, shooter, target, "projectile hit");
+            }
             UUID barrageOwner = session.turfBarrageArrowOwners.remove(turfArrow.getUniqueId());
             if (event.getHitEntity() instanceof Player target
                     && turfArrow.getShooter() instanceof Player shooter) {
