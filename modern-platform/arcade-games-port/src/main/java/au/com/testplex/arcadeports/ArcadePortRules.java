@@ -1774,9 +1774,20 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
-    /** Keep native flight attached to the selected living target; never route to the End portal. */
+    /** Use native pursuit for players and waypoint marker entities. */
     public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasEntityTarget) {
         return hasEntityTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.HOVER;
+    }
+
+    /** A native dragon phase rebuilds its path when assigned a target; do not reset it every pursuit tick. */
+    public static boolean shouldRefreshDragonPhaseTarget(java.util.UUID previousTarget,
+            java.util.UUID nextTarget, boolean phaseChanged) {
+        return phaseChanged || !java.util.Objects.equals(previousTarget, nextTarget);
+    }
+
+    /** Sparkler bursts follow the source FAST update cadence while the item is alive. */
+    public static boolean shouldRenderDragonSparklerBurst(boolean perkUpdate, boolean itemValid) {
+        return perkUpdate && itemValid;
     }
 
     /** Select racers immediately unless a nearby Sparkler has priority. */
