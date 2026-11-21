@@ -343,22 +343,15 @@ public class MonsterManager {
 
                 markBump(player);
 
-                Vector knockDirection;
+                Vector knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
+                        ent.getLocation(), player.getLocation());
                 if (km != null && km.getKit(player) == me.monstermaze.kit.KitType.MAVERICK) {
                     Location target = game.getMobKnockTarget();
                     if (target != null && target.getWorld() == player.getWorld()) {
-                        knockDirection = target.toVector().subtract(player.getLocation().toVector());
-                        knockDirection.setY(0);
-                        if (knockDirection.lengthSquared() > 0.001D) knockDirection.normalize();
-                        else knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
-                                ent.getLocation(), player.getLocation());
-                    } else {
-                        knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
-                                ent.getLocation(), player.getLocation());
+                        Vector towardPad = target.toVector().subtract(player.getLocation().toVector());
+                        towardPad.setY(0);
+                        if (towardPad.lengthSquared() > 0.001D) knockDirection = towardPad.normalize();
                     }
-                } else {
-                    knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
-                            ent.getLocation(), player.getLocation());
                 }
 
                 // Preserve the source launch calculation exactly; do not snap the player upward
