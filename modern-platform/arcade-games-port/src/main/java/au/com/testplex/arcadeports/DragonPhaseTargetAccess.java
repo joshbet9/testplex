@@ -25,10 +25,14 @@ final class DragonPhaseTargetAccess {
                     if (resolved == null) access = resolved = resolve(dragon, target);
                 }
             }
-            Object dragonHandle = resolved.bukkitHandle.invoke(dragon);
+            Object dragonHandle = nativeHandle(dragon);
             Object phaseManager = resolved.getPhaseManager.invoke(dragonHandle);
             Object strafePhase = resolved.getCurrentPhase.invoke(phaseManager);
-            Object targetHandle = resolved.bukkitHandle.invoke(target);
+            // CraftEnderDragon and CraftPlayer/CraftArmorStand declare different
+            // covariant getHandle() methods. A Method resolved from the dragon
+            // class cannot be invoked on the target wrapper, so resolve it from
+            // the actual target runtime class each time a target changes.
+            Object targetHandle = nativeHandle(target);
             resolved.setTargetEntity.invoke(strafePhase, targetHandle);
             if (!accessSuccessLogged) {
                 accessSuccessLogged = true;
@@ -45,14 +49,18 @@ final class DragonPhaseTargetAccess {
         }
     }
 
+    static Object nativeHandle(Object bukkitEntity) throws ReflectiveOperationException {
+        return bukkitEntity.getClass().getMethod("getHandle").invoke(bukkitEntity);
+    }
+
     private static Access resolve(EnderDragon dragon, LivingEntity target) throws ReflectiveOperationException {
         Method bukkitHandle = dragon.getClass().getMethod("getHandle");
-        Object dragonHandle = bukkitHandle.invoke(dragon);
+        Object dragonHandle = nativeHandle(dragon);
         Method getPhaseManager = dragonHandle.getClass().getMethod("getPhaseManager");
         Object phaseManager = getPhaseManager.invoke(dragonHandle);
         Method getCurrentPhase = phaseManager.getClass().getMethod("getCurrentPhase");
         Object strafePhase = getCurrentPhase.invoke(phaseManager);
-        Object targetHandle = target.getClass().getMethod("getHandle").invoke(target);
+        Object targetHandle = nativeHandle(target);
         Method setTargetEntity = null;
         for (String methodName : new String[] {"setTargetEntity", "setTarget"}) {
             for (Method candidate : strafePhase.getClass().getMethods()) {
