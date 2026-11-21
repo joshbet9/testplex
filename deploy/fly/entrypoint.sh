@@ -58,7 +58,7 @@ done
 # A modern-only server must not gain a second, legacy Arcade plugin.
 legacy_arcade="$PLUGIN_DIR/Arcade.jar"
 packaged_arcade="/opt/testplex/plugins/Arcade.jar"
-if [[ -f "$legacy_arcade" && -f "$packaged_arcade" ]]; then
+if [[ -f "$legacy_arcade" && ! -L "$legacy_arcade" && -f "$packaged_arcade" ]]; then
     legacy_descriptor="$(unzip -p "$legacy_arcade" plugin.yml 2>/dev/null || true)"
     packaged_descriptor="$(unzip -p "$packaged_arcade" plugin.yml 2>/dev/null || true)"
     legacy_name="$(printf '%s\\n' "$legacy_descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
