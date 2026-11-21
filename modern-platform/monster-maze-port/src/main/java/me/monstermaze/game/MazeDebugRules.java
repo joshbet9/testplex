@@ -2,10 +2,12 @@ package me.monstermaze.game;
 
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import java.util.UUID;
+import org.bukkit.Location;
+import org.bukkit.util.Vector;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
-    public static final float MOB_MOVE_SPEED = 0.8F;
+    public static final float MOB_MOVE_SPEED = 1.4F;
     public static final int STAGE_TIMER_INITIAL_SECONDS = 60;
     public static final double STAGE_TIMER_DECREASE_PER_STAGE_SECONDS = 2.0D;
     public static final int STAGE_TIMER_MIN_SECONDS = 15;
@@ -76,6 +78,17 @@ public final class MazeDebugRules {
 
     public static double doubleValue(MazeMode mode, String field, double fallback) {
         return GameDebugRuntimeOverrides.doubleValue(key(mode, field), fallback);
+    }
+
+    /** Original Monster Maze waypoint speed, still tunable by authorised debug profiles. */
+    public static float mobMoveSpeed(MazeMode mode) {
+        return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
+    }
+
+    /** Original Mineplex bump trajectory: from the mob's position toward the player in 3D. */
+    public static Vector sourceMobBumpTrajectory(Location monster, Location player) {
+        if (monster == null || player == null) return new Vector();
+        return player.toVector().subtract(monster.toVector());
     }
 
     public static boolean isBumpHitWithinRange(MazeMode mode, double horizontalDistanceSquared,
