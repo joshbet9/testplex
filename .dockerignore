@@ -12,6 +12,7 @@ modern-platform/**
 !modern-platform/target/
 modern-platform/target/**
 !modern-platform/target/TestplexModernArcade.jar
+!modern-platform/target/ArcadeCore.jar
 !modern-platform/arcade-games-port/
 modern-platform/arcade-games-port/**
 !modern-platform/arcade-games-port/target/
