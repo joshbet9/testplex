@@ -908,7 +908,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     /** Record this player's highest stage reached for the active mode+pattern (persisted). */
     private void recordPB(Player player) {
-        if (plugin.isDebugRound() || player == null || plugin.getHostPlugin().isTestPlayer(player)) return;
+        if (!MazeDebugRules.shouldPersistPlayerPB(player != null,
+                player != null && plugin.getHostPlugin().isTestPlayer(player))) return;
         int pattern = getPatternIndex();
         if (pattern < 0) return;
         String kit = null;

@@ -44,8 +44,6 @@ public final class UtilEnt {
             stopNavigation(mob);
             return false;
         }
-        if (distSq < 4.0D) speed = Math.min(speed, 1.0F);
-
         Location currentTarget = NAVIGATION_TARGETS.get(mob);
         if (currentTarget != null && currentTarget.getWorld() == target.getWorld()
                 && currentTarget.distanceSquared(target) < 0.01D && mob.getPathfinder().hasPath()) {

@@ -4,7 +4,7 @@ test-mode: true
 mode: Modern
 solo-mode: false
 debug: true
-record-runs: false
+record-runs: true
 map: eyeofender
 forced-pattern: -1
 mob-overrides:

@@ -11,6 +11,7 @@ import me.monstermaze.game.BuildBypassListener;
 import me.monstermaze.game.GameManager;
 import me.monstermaze.game.ArcadeSessionContext;
 import me.monstermaze.game.MazeMode;
+import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.stats.BackendClient;
 import me.monstermaze.stats.ChallengeManager;
 import me.monstermaze.stats.CompetitiveMatchTracker;
@@ -110,7 +111,8 @@ public final class MonsterMazePlugin {
         this.mode = MazeMode.MODERN;
         this.soloMode = cfg.getBoolean("solo-mode", false);
         this.debug = cfg.getBoolean("debug", false);
-        this.recordRuns = cfg.getBoolean("record-runs", true);
+        this.recordRuns = MazeDebugRules.shouldRecordRuns(
+                cfg.getBoolean("test-mode", true), cfg.getBoolean("record-runs", true));
         if (!cfg.contains("forced-pattern")) {
             cfg.set("forced-pattern", -1);
             saveConfig();
