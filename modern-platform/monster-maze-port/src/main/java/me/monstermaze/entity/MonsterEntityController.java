@@ -51,7 +51,8 @@ public final class MonsterEntityController {
         if (entity instanceof Mob) {
             Mob mob = (Mob) entity;
             mob.setAI(true);
-            mob.setAware(false);
+            // Native PathFinder movement requires awareness; all vanilla goals are removed separately.
+            mob.setAware(true);
         }
         setMovementSpeed(entity);
         normalizeHitbox(entity);
