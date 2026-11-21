@@ -7,10 +7,13 @@ import org.bukkit.util.Vector;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
-    // Match the speed that the previous controller applied near waypoints. Keeping
-    // this constant across the whole segment prevents long straights from running
-    // at the faster 1.4 multiplier while corners were clamped to 1.0.
-    public static final float MOB_MOVE_SPEED = 1.0F;
+    // Reborn 1.21 source speed passed to CreatureMoveFast. The integrated Paper
+    // port uses native navigation, whose multiplier is relative to the mob's
+    // 0.2 movement attribute, so convert the source's 0.8 * 0.175 movement step
+    // every two ticks into an equivalent 0.35 pathfinder multiplier.
+    public static final float MOB_MOVE_SPEED = 0.8F;
+    private static final float SOURCE_MOVE_STEP_PER_TICK = 0.175F / 2.0F;
+    private static final float MOB_MOVEMENT_SPEED_ATTRIBUTE = 0.2F;
     public static final int STAGE_TIMER_INITIAL_SECONDS = 60;
     public static final double STAGE_TIMER_DECREASE_PER_STAGE_SECONDS = 2.0D;
     public static final int STAGE_TIMER_MIN_SECONDS = 15;
@@ -83,9 +86,14 @@ public final class MazeDebugRules {
         return GameDebugRuntimeOverrides.doubleValue(key(mode, field), fallback);
     }
 
-    /** Uniform waypoint path speed, still tunable by authorised debug profiles. */
+    /** Reborn source speed parameter, still tunable by authorised debug profiles. */
     public static float mobMoveSpeed(MazeMode mode) {
         return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
+    }
+
+    /** Convert the source's fixed per-tick movement step to Paper's pathfinder multiplier. */
+    public static float mobPathfinderSpeed(MazeMode mode) {
+        return mobMoveSpeed(mode) * SOURCE_MOVE_STEP_PER_TICK / MOB_MOVEMENT_SPEED_ATTRIBUTE;
     }
 
     /** Test runs still persist PBs; only synthetic test accounts are excluded. */

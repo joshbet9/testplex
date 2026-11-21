@@ -10,6 +10,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -314,6 +315,19 @@ public class LeaderboardManager {
         return localPatternLeaderboard(mode, pattern, limit);
     }
 
+    /** Rank each player's best for one kit on one maze pattern, independent of other kits. */
+    public List<Entry> getKitPatternLeaderboard(MazeMode mode, int pattern, String kitId, int limit) {
+        if (mode == null || pattern < 0 || pattern >= PATTERN_COUNT || kitId == null || kitId.isBlank()
+                || limit <= 0) return new ArrayList<Entry>();
+        List<OverallEntry> remoteRows = null;
+        if (remoteReady) {
+            Map<Integer, List<OverallEntry>> byPattern = remotePattern.get(modeKey(mode));
+            remoteRows = byPattern == null ? null : byPattern.get(pattern);
+        }
+        return mergeKitPatternRows(remoteRows,
+                localKitPatternRows(data, mode, pattern, kitId, this::displayName), kitId, pattern, limit);
+    }
+
     /** Merge durable local PBs into the hosted pattern board while remote submission catches up. */
     static List<Entry> mergePatternRows(List<OverallEntry> remoteRows, List<Entry> localRows, int limit) {
         if (limit <= 0) return new ArrayList<Entry>();
@@ -333,6 +347,66 @@ public class LeaderboardManager {
             }
         });
         return ranked.size() > limit ? new ArrayList<Entry>(ranked.subList(0, limit)) : ranked;
+    }
+
+    /**
+     * Rank local stored kit PBs with any matching kit rows available from the public pattern board.
+     * The remote pattern endpoint exposes only each player's overall kit, so the durable local
+     * per-kit cache is required to retain lower personal bests for the other kits.
+     */
+    static List<Entry> mergeKitPatternRows(List<OverallEntry> remoteRows, List<Entry> localRows,
+            String kitId, int pattern, int limit) {
+        if (kitId == null || limit <= 0) return new ArrayList<Entry>();
+        Map<String, Entry> bestByPlayer = new TreeMap<String, Entry>(String.CASE_INSENSITIVE_ORDER);
+        if (remoteRows != null) for (OverallEntry row : remoteRows) {
+            if (row != null && row.pattern == pattern && row.kit != null
+                    && row.kit.equalsIgnoreCase(kitId)) {
+                mergePatternEntry(bestByPlayer, new Entry(row.name, row.stage, row.kit));
+            }
+        }
+        if (localRows != null) for (Entry row : localRows) {
+            if (row != null && row.kit != null && row.kit.equalsIgnoreCase(kitId)) {
+                mergePatternEntry(bestByPlayer, row);
+            }
+        }
+        List<Entry> ranked = new ArrayList<Entry>(bestByPlayer.values());
+        Collections.sort(ranked, new Comparator<Entry>() {
+            @Override public int compare(Entry left, Entry right) {
+                int stageOrder = Integer.compare(right.stage, left.stage);
+                if (stageOrder != 0) return stageOrder;
+                String leftName = left.name == null ? "" : left.name;
+                String rightName = right.name == null ? "" : right.name;
+                return String.CASE_INSENSITIVE_ORDER.compare(leftName, rightName);
+            }
+        });
+        return ranked.size() > limit ? new ArrayList<Entry>(ranked.subList(0, limit)) : ranked;
+    }
+
+    static List<Entry> localKitPatternRows(YamlConfiguration records, MazeMode mode, int pattern,
+            String kitId, Function<UUID, String> nameForPlayer) {
+        if (records == null || mode == null || pattern < 0 || pattern >= PATTERN_COUNT
+                || kitId == null || kitId.isBlank()) return new ArrayList<Entry>();
+        ConfigurationSection modeSection = records.getConfigurationSection(modeKey(mode));
+        ConfigurationSection patternSection = modeSection == null ? null
+                : modeSection.getConfigurationSection(patternKey(pattern));
+        if (patternSection == null) return new ArrayList<Entry>();
+        List<Entry> rows = new ArrayList<Entry>();
+        for (String key : patternSection.getKeys(false)) {
+            UUID player;
+            try { player = UUID.fromString(key); }
+            catch (IllegalArgumentException ignored) { continue; }
+            ConfigurationSection playerSection = patternSection.getConfigurationSection(key);
+            if (playerSection == null) continue;
+            String storedKit = null;
+            for (String candidate : playerSection.getKeys(false)) {
+                if (candidate.equalsIgnoreCase(kitId)) { storedKit = candidate; break; }
+            }
+            if (storedKit == null) continue;
+            int stage = playerSection.getInt(storedKit, 0);
+            String name = nameForPlayer == null ? null : nameForPlayer.apply(player);
+            if (stage > 0 && name != null && !name.isBlank()) rows.add(new Entry(name, stage, storedKit));
+        }
+        return rows;
     }
 
     private static void mergePatternEntry(Map<String, Entry> bestByPlayer, Entry candidate) {
