@@ -309,14 +309,36 @@ public class LeaderboardManager {
         if (remoteReady) {
             Map<Integer, List<OverallEntry>> byPattern = remotePattern.get(modeKey(mode));
             List<OverallEntry> rows = byPattern == null ? null : byPattern.get(pattern);
-            List<Entry> out = new ArrayList<Entry>();
-            if (rows != null) for (OverallEntry row : rows) {
-                if (out.size() >= limit) break;
-                out.add(new Entry(row.name, row.stage, row.kit));
-            }
-            return out;
+            return mergePatternRows(rows, localPatternLeaderboard(mode, pattern, Integer.MAX_VALUE), limit);
         }
         return localPatternLeaderboard(mode, pattern, limit);
+    }
+
+    /** Merge durable local PBs into the hosted pattern board while remote submission catches up. */
+    static List<Entry> mergePatternRows(List<OverallEntry> remoteRows, List<Entry> localRows, int limit) {
+        if (limit <= 0) return new ArrayList<Entry>();
+        Map<String, Entry> bestByPlayer = new TreeMap<String, Entry>(String.CASE_INSENSITIVE_ORDER);
+        if (remoteRows != null) for (OverallEntry row : remoteRows) {
+            if (row != null) mergePatternEntry(bestByPlayer, new Entry(row.name, row.stage, row.kit));
+        }
+        if (localRows != null) for (Entry row : localRows) mergePatternEntry(bestByPlayer, row);
+        List<Entry> ranked = new ArrayList<Entry>(bestByPlayer.values());
+        Collections.sort(ranked, new Comparator<Entry>() {
+            @Override public int compare(Entry left, Entry right) {
+                int stageOrder = Integer.compare(right.stage, left.stage);
+                if (stageOrder != 0) return stageOrder;
+                String leftName = left.name == null ? "" : left.name;
+                String rightName = right.name == null ? "" : right.name;
+                return String.CASE_INSENSITIVE_ORDER.compare(leftName, rightName);
+            }
+        });
+        return ranked.size() > limit ? new ArrayList<Entry>(ranked.subList(0, limit)) : ranked;
+    }
+
+    private static void mergePatternEntry(Map<String, Entry> bestByPlayer, Entry candidate) {
+        if (candidate == null || candidate.name == null || candidate.name.isBlank() || candidate.stage < 1) return;
+        Entry previous = bestByPlayer.get(candidate.name);
+        if (previous == null || candidate.stage > previous.stage) bestByPlayer.put(candidate.name, candidate);
     }
 
     private List<Entry> localPatternLeaderboard(MazeMode mode, int pattern, int limit) {
