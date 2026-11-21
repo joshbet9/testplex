@@ -1776,7 +1776,7 @@ public final class ArcadePortRules {
 
     /** Use native pursuit for players and waypoint marker entities. */
     public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasEntityTarget) {
-        return hasEntityTarget ? EnderDragon.Phase.CHARGE_PLAYER : EnderDragon.Phase.HOVER;
+        return hasEntityTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.HOVER;
     }
 
     /** A native dragon phase rebuilds its path when assigned a target; do not reset it every pursuit tick. */
