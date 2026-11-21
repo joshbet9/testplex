@@ -10136,10 +10136,12 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.GREEN + "Medic: keep your Revival Potions ready for downed Humans.");
             }
             case "editor" -> {
-                player.getInventory().addItem(new ItemStack(Material.STONE_AXE),
-                        new ItemStack(Material.STONE_PICKAXE), new ItemStack(Material.STONE_SHOVEL),
+                player.getInventory().addItem(witherEditorCanDestroy(new ItemStack(Material.STONE_AXE)),
+                        witherEditorCanDestroy(new ItemStack(Material.STONE_PICKAXE)),
+                        witherEditorCanDestroy(new ItemStack(Material.STONE_SHOVEL)),
                         new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 2),
-                        new ItemStack(Material.COBBLESTONE, 32), new ItemStack(Material.OAK_PLANKS, 32),
+                        witherEditorCanPlaceOn(new ItemStack(Material.COBBLESTONE, 32)),
+                        witherEditorCanPlaceOn(new ItemStack(Material.OAK_PLANKS, 32)),
                         revival[0], revival[1], stew);
                 player.sendMessage(ChatColor.GREEN + "Editor: place and break blocks above the four-block floor limit.");
             }
@@ -10154,6 +10156,24 @@ public final class ArcadePortManager implements Listener {
                         revival[0], revival[1], stew);
             }
         }
+    }
+
+    private ItemStack witherEditorCanDestroy(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setCanDestroy(WitherAssaultRules.editorAdventureBlocks());
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack witherEditorCanPlaceOn(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setCanPlaceOn(WitherAssaultRules.editorAdventureBlocks());
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private void giveKit(Session session, Player player) {
