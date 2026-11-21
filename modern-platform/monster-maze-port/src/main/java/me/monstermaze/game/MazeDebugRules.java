@@ -7,13 +7,11 @@ import org.bukkit.util.Vector;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
-    // Reborn 1.21 source speed passed to CreatureMoveFast. The integrated Paper
-    // port uses native navigation, whose multiplier is relative to the mob's
-    // 0.2 movement attribute, so convert the source's 0.8 * 0.175 movement step
-    // every two ticks into an equivalent 0.35 pathfinder multiplier.
+    // Reborn 1.21 source speed passed to CreatureMoveFast. The source applies
+    // this as a fixed horizontal step every other tick, not as a pathfinder
+    // speed multiplier.
     public static final float MOB_MOVE_SPEED = 0.8F;
-    private static final float SOURCE_MOVE_STEP_PER_TICK = 0.175F / 2.0F;
-    private static final float MOB_MOVEMENT_SPEED_ATTRIBUTE = 0.2F;
+    private static final double SOURCE_MOVE_STEP_MULTIPLIER = 0.175D;
     public static final int STAGE_TIMER_INITIAL_SECONDS = 60;
     public static final double STAGE_TIMER_DECREASE_PER_STAGE_SECONDS = 2.0D;
     public static final int STAGE_TIMER_MIN_SECONDS = 15;
@@ -91,9 +89,13 @@ public final class MazeDebugRules {
         return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
     }
 
-    /** Convert the source's fixed per-tick movement step to Paper's pathfinder multiplier. */
-    public static float mobPathfinderSpeed(MazeMode mode) {
-        return mobMoveSpeed(mode) * SOURCE_MOVE_STEP_PER_TICK / MOB_MOVEMENT_SPEED_ATTRIBUTE;
+    /** Reproduce Reborn CreatureMoveFast's distance-sensitive step exactly. */
+    public static double sourceMobMoveStep(float sourceSpeed, double distanceSquared, double horizontalDistance) {
+        if (!Float.isFinite(sourceSpeed) || !Double.isFinite(distanceSquared)
+                || !Double.isFinite(horizontalDistance) || distanceSquared < 0.0D
+                || horizontalDistance <= 0.0D) return 0.0D;
+        float effectiveSpeed = distanceSquared < 4.0D ? Math.min(sourceSpeed, 1.0F) : sourceSpeed;
+        return Math.min(effectiveSpeed * SOURCE_MOVE_STEP_MULTIPLIER, horizontalDistance);
     }
 
     /** Test runs still persist PBs; only synthetic test accounts are excluded. */

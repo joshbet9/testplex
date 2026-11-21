@@ -5,6 +5,7 @@ import me.monstermaze.game.MazeMode;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -118,5 +119,25 @@ class LeaderboardManagerKitLeaderboardTest {
         assertEquals("Alice", ranked.get(2).name);
         assertEquals(11, ranked.get(2).stage);
         assertEquals(1, LeaderboardManager.mergeKitPatternRows(null, local, "jumper", 1, 1).size());
+    }
+
+    @Test
+    void placementStillRanksSavedRecordWhenOfflineNameLookupOmittedThePlayerFromRows() {
+        List<LeaderboardManager.Entry> rows = List.of(
+                new LeaderboardManager.Entry("Alice", 20, "jumper"),
+                new LeaderboardManager.Entry("Zoe", 15, "jumper"));
+
+        assertEquals(3, LeaderboardManager.kitPatternRank(rows, "Josh", 12, Set.of("a1b2c3")),
+                "the player's locally saved PB must still receive a rank when offline-name resolution omitted its row");
+    }
+
+    @Test
+    void placementUsesStageThenNameOrderingAndSkipsTheViewerRow() {
+        List<LeaderboardManager.Entry> rows = List.of(
+                new LeaderboardManager.Entry("Alice", 15, "jumper"),
+                new LeaderboardManager.Entry("Josh", 12, "jumper"),
+                new LeaderboardManager.Entry("Zoe", 12, "jumper"));
+
+        assertEquals(2, LeaderboardManager.kitPatternRank(rows, "Josh", 12, Set.of("Josh")));
     }
 }

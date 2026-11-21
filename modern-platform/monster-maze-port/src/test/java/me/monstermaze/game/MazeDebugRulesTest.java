@@ -10,13 +10,19 @@ import org.junit.jupiter.api.Test;
 class MazeDebugRulesTest {
     @Test void mobMovementSpeedDefaultsToSourceAndDebugOverrideIsConsumed() {
         assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        assertEquals(0.35F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
+        assertEquals(0.14D, MazeDebugRules.sourceMobMoveStep(0.8F, 25.0D, 3.0D), 0.00001D);
+        assertEquals(0.175D, MazeDebugRules.sourceMobMoveStep(1.6F, 1.0D, 3.0D), 0.00001D,
+                "within two blocks Reborn caps the requested speed at 1.0");
+        assertEquals(0.04D, MazeDebugRules.sourceMobMoveStep(0.8F, 25.0D, 0.04D), 0.00001D,
+                "the source step must stop at the waypoint rather than overshoot");
         GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_MODERN_MOB_MOVE_SPEED", 1.6D));
         assertEquals(1.6F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        assertEquals(0.7F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
+        assertEquals(0.28D, MazeDebugRules.sourceMobMoveStep(
+                MazeDebugRules.mobMoveSpeed(MazeMode.MODERN), 25.0D, 3.0D), 0.00001D);
         GameDebugRuntimeOverrides.clear();
         assertEquals(0.8F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        assertEquals(0.35F, MazeDebugRules.mobPathfinderSpeed(MazeMode.MODERN), 0.00001F);
+        assertEquals(0.14D, MazeDebugRules.sourceMobMoveStep(
+                MazeDebugRules.mobMoveSpeed(MazeMode.MODERN), 25.0D, 3.0D), 0.00001D);
     }
 
     @Test void playerPersonalBestsPersistEvenDuringDebugRoundsButNeverForSyntheticPlayers() {
