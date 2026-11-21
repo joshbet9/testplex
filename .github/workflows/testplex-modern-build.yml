@@ -72,23 +72,6 @@ jobs:
       - name: Build shared Arcade mechanics, Snake and Monster Maze modules
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
-      - name: Build shared Arcade core with the modern-session hunger guard
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn --batch-mode --no-transfer-progress \
-            -f Plugins/pom.xml \
-            -Dmineplex.libs.dir="${GITHUB_WORKSPACE}/libs" \
-            -DskipTests \
-            install
-          test -s Plugins/out/Arcade.jar
-          unzip -tq Plugins/out/Arcade.jar >/dev/null
-          unzip -p Plugins/out/Arcade.jar plugin.yml | grep -Fxq "name: Arcade"
-          jar tf Plugins/out/Arcade.jar | grep -Fxq "nautilus/game/arcade/managers/GameFlagManager.class"
-          grep -Fq 'testplex-modern-arcade-session' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameFlagManager.java
-          mkdir -p modern-platform/target
-          cp Plugins/out/Arcade.jar modern-platform/target/ArcadeCore.jar
-
       - name: Test isolated Fly Monster Maze world provisioning
         run: bash deploy/fly/test-monster-maze-world-provisioning.sh
 
@@ -169,6 +152,23 @@ jobs:
           done
           tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz >/dev/null
           sha256sum modern-platform/target/WizardsSourceMaps.tar.gz
+
+      - name: Build shared Arcade core with the modern-session hunger guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress \
+            -f Plugins/pom.xml \
+            -Dmineplex.libs.dir="${GITHUB_WORKSPACE}/libs" \
+            -DskipTests \
+            install
+          test -s Plugins/out/Arcade.jar
+          unzip -tq Plugins/out/Arcade.jar >/dev/null
+          unzip -p Plugins/out/Arcade.jar plugin.yml | grep -Fxq "name: Arcade"
+          jar tf Plugins/out/Arcade.jar | grep -Fxq "nautilus/game/arcade/managers/GameFlagManager.class"
+          grep -Fq 'testplex-modern-arcade-session' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameFlagManager.java
+          mkdir -p modern-platform/target
+          cp Plugins/out/Arcade.jar modern-platform/target/ArcadeCore.jar
 
       - name: Build Fly production image with pinned game worlds
         shell: bash
