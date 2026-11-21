@@ -58,19 +58,14 @@ done
 # A modern-only server must not gain a second, legacy Arcade plugin.
 legacy_arcade="$PLUGIN_DIR/Arcade.jar"
 packaged_arcade="/opt/testplex/plugins/Arcade.jar"
-if [[ -f "$legacy_arcade" && ! -L "$legacy_arcade" && -f "$packaged_arcade" ]]; then
-    legacy_descriptor="$(unzip -p "$legacy_arcade" plugin.yml 2>/dev/null || true)"
-    packaged_descriptor="$(unzip -p "$packaged_arcade" plugin.yml 2>/dev/null || true)"
-    legacy_name="$(printf '%s\n' "$legacy_descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\"\\r")"
-    packaged_name="$(printf '%s\n' "$packaged_descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\"\\r")"
-    if [[ "$legacy_name" == "Arcade" ]]; then
-        [[ "$packaged_name" == "Arcade" ]] || {
-            echo "FATAL: packaged hunger-guard core has unexpected plugin descriptor [$packaged_name]." >&2
-            exit 1
-        }
-        install -o minecraft -g minecraft -m 0644 "$packaged_arcade" "$legacy_arcade"
-        echo "Refreshed the already-installed Arcade core with the shared modern-session hunger guard."
-    fi
+if [[ -f "$legacy_arcade" && ! -L "$legacy_arcade" && -f "$packaged_arcade" ]] &&
+   unzip -p "$legacy_arcade" plugin.yml 2>/dev/null | grep -Fxq "name: Arcade"; then
+    unzip -p "$packaged_arcade" plugin.yml | grep -Fxq "name: Arcade" || {
+        echo "FATAL: packaged hunger-guard core has an unexpected plugin descriptor." >&2
+        exit 1
+    }
+    install -o minecraft -g minecraft -m 0644 "$packaged_arcade" "$legacy_arcade"
+    echo "Refreshed the already-installed Arcade core with the shared modern-session hunger guard."
 fi
 install -o minecraft -g minecraft -m 0644 /opt/testplex/fake-player-plugin.jar "$PLUGIN_DIR/FakePlayerPlugin.jar"
 install -o minecraft -g minecraft -m 0644 /opt/testplex/packetevents.jar "$PLUGIN_DIR/PacketEvents.jar"
