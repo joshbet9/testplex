@@ -343,8 +343,7 @@ public class MonsterManager {
 
                 markBump(player);
 
-                Vector knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
-                        ent.getLocation(), player.getLocation());
+                Vector knockDirection = MazeDebugRules.sourceMobBumpTrajectory(ent.getLocation(), player.getLocation());
                 if (km != null && km.getKit(player) == me.monstermaze.kit.KitType.MAVERICK) {
                     Location target = game.getMobKnockTarget();
                     if (target != null && target.getWorld() == player.getWorld()) {
