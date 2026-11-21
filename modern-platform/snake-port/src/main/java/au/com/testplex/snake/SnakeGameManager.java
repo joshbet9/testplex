@@ -559,32 +559,12 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
     private void updateMatchScoreboard(long now) {
         if (matchScoreboardObjective == null || now < nextScoreboardUpdateAt) return;
         nextScoreboardUpdateAt = now + 500L;
-        List<String> lines = new ArrayList<>();
-        if (!live) {
-            lines.add(ChatColor.YELLOW + "Starts in " + formatScoreboardTime(Math.max(0L, liveAt - now)));
-        } else {
-            lines.add(ChatColor.GREEN + "In Progress");
-        }
-        lines.add(ChatColor.GRAY + "Map: " + ChatColor.WHITE + SnakeMapCatalog.displayName(mapResource));
-        lines.add(" ");
-        long alive = snakes.values().stream().filter(state -> state.alive && state.player.isOnline()).count();
-        lines.add(ChatColor.AQUA + "Players: " + ChatColor.WHITE + alive + "/" + startingPlayerCount);
-        lines.add(ChatColor.YELLOW + "Food: " + ChatColor.WHITE + foods.size());
-        lines.add("  ");
-        lines.add(ChatColor.GOLD + "Top Snakes");
-        snakes.values().stream()
+        List<SnakeScoreboardLayout.Participant> roster = snakes.values().stream()
                 .filter(state -> state.player != null)
-                .sorted(java.util.Comparator
-                        .comparingInt((SnakeState state) -> state.kills).reversed()
-                        .thenComparing(java.util.Comparator.comparingInt(
-                                (SnakeState state) -> state.maxTailLength).reversed())
-                        .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
-                .limit(4)
-                .forEach(state -> lines.add((state.alive ? ChatColor.GREEN : ChatColor.GRAY)
-                        + state.player.getName() + ChatColor.WHITE + " " + state.kills + "K"));
-        lines.add("   ");
-        lines.add(ChatColor.YELLOW + "Time: " + ChatColor.WHITE
-                + formatScoreboardTime(Math.max(0L, now - startedAt)));
+                .map(state -> new SnakeScoreboardLayout.Participant(
+                        state.player.getName(), state.alive && state.player.isOnline()))
+                .toList();
+        List<String> lines = SnakeScoreboardLayout.lines(roster);
 
         for (int index = 0; index < matchScoreboardTeams.size(); index++) {
             Team line = matchScoreboardTeams.get(index);
@@ -603,11 +583,6 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 ArcadeCollisionRules.assign(state.player, matchScoreboard);
             }
         }
-    }
-
-    private String formatScoreboardTime(long millis) {
-        long seconds = (Math.max(0L, millis) + 999L) / 1_000L;
-        return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
     }
 
     private void tick() {
@@ -737,12 +712,15 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             return;
         }
         Vector direction = steeringDirection(state);
-        double speed = SnakeRules.movementSpeed(state.segments.size(), state.speedUntil > now);
-        Location next = headLocation.clone().add(direction.multiply(speed));
+        Vector velocity = SnakeRules.movementVelocity(direction,
+                state.segments.size(), state.speedUntil > now);
+        Location next = headLocation.clone().add(velocity);
         next.setY(headLocation.getY());
-        next.setYaw(player.getLocation().getYaw());
-        next.setPitch(0.0F);
-        state.segments.get(0).teleport(next);
+        Sheep head = state.segments.get(0);
+        // Mineplex's CreatureMoveFast applied motion to the sheep every tick. Teleporting
+        // the head here skipped entity movement/collision and made steering feel abrupt.
+        head.setVelocity(new Vector(velocity.getX(), 0.0D, velocity.getZ()));
+        head.setRotation(player.getLocation().getYaw(), 0.0F);
         state.path.addFirst(next.clone());
         // Retain enough route history for the complete snake even after long source-style rounds.
         int maxPathPoints = Math.max(2400, state.segments.size() * 8);

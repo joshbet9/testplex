@@ -280,6 +280,15 @@ public final class SnakeRules {
         return movementConversionScale() * (movementConversionBase() + 2.0D * sourceMultiplier);
     }
 
+    /** Apply the source CreatureMoveFast speed as horizontal entity motion rather than teleporting the head. */
+    public static Vector movementVelocity(Vector direction, int tailLength, boolean speedBoost) {
+        if (direction == null) return new Vector();
+        Vector horizontal = direction.clone().setY(0.0D);
+        if (!Double.isFinite(horizontal.getX()) || !Double.isFinite(horizontal.getZ())
+                || horizontal.lengthSquared() < 1.0E-9D) return new Vector();
+        return horizontal.normalize().multiply(movementSpeed(tailLength, speedBoost));
+    }
+
     /** Match Reborn's per-round player index palette, wrapping safely when more than 16 players queue. */
     public static int colorIndexForParticipant(int participantIndex, int paletteSize) {
         return paletteSize <= 0 ? 0 : Math.floorMod(participantIndex, paletteSize);
