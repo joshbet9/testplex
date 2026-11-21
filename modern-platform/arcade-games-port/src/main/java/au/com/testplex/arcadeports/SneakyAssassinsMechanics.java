@@ -418,14 +418,6 @@ final class SneakyAssassinsMechanics {
         int seconds = globalRevealEndsAt > now
                 ? 0 : (int) ((revealRemaining + 999L) / 1_000L);
         updateScoreboard(seconds);
-        for (UUID id : players.keySet()) {
-            Player player = players.get(id);
-            if (player == null || !player.isOnline() || !isAlive.test(id)) continue;
-            int count = powerUpCounts.getOrDefault(id, 0);
-            player.sendActionBar(ChatColor.GOLD + "Power-ups: " + count + "/" + SneakyAssassinsRules.maxPowerUpProgress()
-                    + ChatColor.DARK_GRAY + "  |  " + ChatColor.YELLOW
-                    + (masterAssassins.contains(id) ? "MASTER" : "Reveal: " + seconds + "s"));
-        }
     }
 
     private void setupScoreboard() {
@@ -470,13 +462,17 @@ final class SneakyAssassinsMechanics {
             addScoreboardLine(ChatColor.GREEN + "Players Alive", alive.size(), line--);
             addScoreboardLine(ChatColor.RED + "Players Dead", dead.size(), line--);
         }
-        addScoreboardLine(ChatColor.YELLOW + "Player Reveal", Math.max(0, revealSeconds), line--);
+        addScoreboardLine(ChatColor.YELLOW + "Player Reveal", SneakyAssassinsRules.revealCountdownSeconds(revealSeconds), line--);
     }
 
     private void addScoreboardLine(String label, int value, int score) {
+        addScoreboardLine(label, Integer.toString(value), score);
+    }
+
+    private void addScoreboardLine(String label, String value, int score) {
         String entry = label;
         scoreboardObjective.getScore(entry).setScore(score);
-        String valueEntry = ChatColor.WHITE + String.valueOf(value);
+        String valueEntry = ChatColor.WHITE + value;
         // Preserve uniqueness when a player name happens to match a display line.
         if (scoreboard.getEntries().contains(valueEntry)) valueEntry += ChatColor.RESET;
         scoreboardObjective.getScore(valueEntry).setScore(score - 1);

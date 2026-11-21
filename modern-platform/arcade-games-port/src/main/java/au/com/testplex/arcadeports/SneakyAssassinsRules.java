@@ -131,6 +131,7 @@ final class SneakyAssassinsRules {
     static long firstPowerUpDelayMillis() { return value("FIRST_POWERUP_DELAY_MILLIS", FIRST_POWERUP_DELAY_MILLIS); }
     static long nextPowerUpDelayMillis() { return value("NEXT_POWERUP_DELAY_MILLIS", NEXT_POWERUP_DELAY_MILLIS); }
     static int maxActivePowerUps() { return GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", MAX_ACTIVE_POWERUPS); }
+    static String revealCountdownSeconds(int seconds) { return Math.max(0, seconds) + "s"; }
     static int npcPatrolOrderChanceDenominator() { return Math.max(1, GameDebugRuntimeOverrides.intValue(
             "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", NPC_PATROL_ORDER_CHANCE_DENOMINATOR)); }
 

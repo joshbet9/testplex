@@ -20,6 +20,13 @@ class SneakyAssassinsParityTest {
     void ambientTownVillagersUseTheirNormalMobAi() {
         assertTrue(SneakyAssassinsRules.ambientVillagerAiEnabled());
     }
+
+    @Test
+    void playerRevealScoreboardCountdownIncludesSecondsAndNeverGoesNegative() {
+        assertEquals("29s", SneakyAssassinsRules.revealCountdownSeconds(29));
+        assertEquals("0s", SneakyAssassinsRules.revealCountdownSeconds(0));
+        assertEquals("0s", SneakyAssassinsRules.revealCountdownSeconds(-1));
+    }
     @Test void registersAndNormalizesTheFourSourceKits() {
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("Escape Artist"));
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("escape_artist"));
