@@ -85,10 +85,13 @@ public final class MazeDebugRules {
         return Math.max(0.0F, floatValue(mode, "MOB_MOVE_SPEED", MOB_MOVE_SPEED));
     }
 
-    /** Original Mineplex bump trajectory: from the mob's position toward the player in 3D. */
+    /** Original Mineplex bump direction is horizontal; vertical lift comes only from the configured impulse. */
     public static Vector sourceMobBumpTrajectory(Location monster, Location player) {
         if (monster == null || player == null) return new Vector();
-        return player.toVector().subtract(monster.toVector());
+        Vector direction = player.toVector().subtract(monster.toVector());
+        direction.setY(0.0D);
+        if (direction.lengthSquared() <= 1.0E-6D) return new Vector(1.0D, 0.0D, 0.0D);
+        return direction;
     }
 
     public static boolean isBumpHitWithinRange(MazeMode mode, double horizontalDistanceSquared,
