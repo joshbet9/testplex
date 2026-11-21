@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.UUID;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.util.Vector;
 
@@ -153,6 +154,25 @@ class DragonsDebugRulesTest {
     void autonomousDragonsTrackLivingTargetsAndDoNotRouteToTheEndPortal() {
         assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
         assertEquals(EnderDragon.Phase.HOVER, ArcadePortRules.dragonsAutonomousPhase(false));
+    }
+
+    @Test
+    void nativeDragonPhasePathIsRefreshedOnlyWhenTheEntityOrPhaseChanges() {
+        UUID player = UUID.randomUUID();
+        UUID marker = UUID.randomUUID();
+
+        assertTrue(ArcadePortRules.shouldRefreshDragonPhaseTarget(null, player, false));
+        assertFalse(ArcadePortRules.shouldRefreshDragonPhaseTarget(player, player, false));
+        assertTrue(ArcadePortRules.shouldRefreshDragonPhaseTarget(player, player, true));
+        assertTrue(ArcadePortRules.shouldRefreshDragonPhaseTarget(player, marker, false));
+        assertTrue(ArcadePortRules.shouldRefreshDragonPhaseTarget(marker, null, false));
+    }
+
+    @Test
+    void sparklerBurstUsesTheSourceFastCadenceAndStopsAfterTheItemExpires() {
+        assertFalse(ArcadePortRules.shouldRenderDragonSparklerBurst(false, true));
+        assertTrue(ArcadePortRules.shouldRenderDragonSparklerBurst(true, true));
+        assertFalse(ArcadePortRules.shouldRenderDragonSparklerBurst(true, false));
     }
 
     @Test

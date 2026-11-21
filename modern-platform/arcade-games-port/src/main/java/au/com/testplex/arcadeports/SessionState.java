@@ -750,10 +750,10 @@ class SessionState {
     final Set<UUID> dragonMarksmanFiring = new HashSet<>();
     final Set<UUID> dragonTrackedArrows = new HashSet<>();
     final Set<UUID> dragonSparklerItems = new HashSet<>();
-    final Set<UUID> dragonSparklerLanded = new HashSet<>();
     final Map<UUID, Long> dragonCompassNextUseAt = new HashMap<>();
     final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
     final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
+    final Map<UUID, UUID> dragonNativePhaseTargets = new HashMap<>();
     final Map<UUID, Vector> dragonFlightVectors = new HashMap<>();
     final Map<UUID, Location> dragonLastBlockDamageLocation = new HashMap<>();
     Location dragonSpectatorLocation;

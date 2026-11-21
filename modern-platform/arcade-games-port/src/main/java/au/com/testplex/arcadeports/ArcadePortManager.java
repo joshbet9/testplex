@@ -11935,6 +11935,7 @@ public final class ArcadePortManager implements Listener {
         player.setCooldown(Material.END_CRYSTAL,
                 (int) Math.ceil(GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS) / 50.0D));
         session.dragonTargetPlayers.remove(dragon.getUniqueId()); session.dragonTargetLocations.remove(dragon.getUniqueId());
+        session.dragonNativePhaseTargets.remove(dragon.getUniqueId());
         player.setGameMode(GameMode.SPECTATOR); player.setSpectatorTarget(dragon);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.9F, 1.2F);
         player.sendTitle(ChatColor.DARK_PURPLE + "DRAGON TAMER", ChatColor.LIGHT_PURPLE + "Look where you want the dragon to fly", 0, 35, 8);
@@ -11968,6 +11969,7 @@ public final class ArcadePortManager implements Listener {
             dragon.setTarget(null);
             dragon.setAI(true);
             dragon.setPhase(EnderDragon.Phase.CIRCLING);
+            session.dragonNativePhaseTargets.remove(dragon.getUniqueId());
         }
         Player player = session.players.get(playerId);
         if (!restorePlayer || player == null || !player.isOnline()) return;
@@ -17005,6 +17007,7 @@ public final class ArcadePortManager implements Listener {
                         "Your controlled dragon is no longer available.", true);
                 session.dragonTargetLocations.remove(id);
                 session.dragonTargetPlayers.remove(id);
+                session.dragonNativePhaseTargets.remove(id);
                 session.dragonFlightVectors.remove(id);
                 session.dragonLastBlockDamageLocation.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
@@ -17069,8 +17072,10 @@ public final class ArcadePortManager implements Listener {
                     session.dragonTargetLocations.put(dragonId, initialSkyTarget);
                     dragon.setPodium(initialSkyTarget);
                 }
+                EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(initialTarget != null);
+                dragon.setPhase(initialPhase);
                 dragon.setTarget(initialTarget);
-                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(initialTarget != null));
+                if (initialTarget != null) setDragonNativePhaseTarget(session, dragon, initialTarget, true);
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -17203,27 +17208,36 @@ public final class ArcadePortManager implements Listener {
                 if (selectedPlayer != null && selectedPlayer.isOnline()
                         && session.alive.contains(selectedPlayer.getUniqueId())) {
                     removeDragonWaypointMarker(session, dragonId);
-                    dragon.setTarget(selectedPlayer);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
+                    boolean phaseChanged = dragon.getPhase() != phase;
+                    if (phaseChanged) dragon.setPhase(phase);
+                    dragon.setTarget(selectedPlayer);
+                    // Mob#setTarget updates the general target only. The native dragon flight phase
+                    // has its own attackTarget; refresh only on target/phase changes so its native
+                    // path is not discarded every 125 ms while tracking a moving player.
+                    setDragonNativePhaseTarget(session, dragon, selectedPlayer, phaseChanged);
                 } else if (selectedMarker instanceof org.bukkit.entity.LivingEntity livingMarker
                         && selectedMarker.isValid()) {
                     removeDragonWaypointMarker(session, dragonId);
-                    // Paper's strafing phase uses native dragon pathfinding toward living entities.
-                    // This mirrors the source target-entity path without replacing its flight AI.
-                    dragon.setTarget(livingMarker);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
+                    boolean phaseChanged = dragon.getPhase() != phase;
+                    if (phaseChanged) dragon.setPhase(phase);
+                    dragon.setTarget(livingMarker);
+                    setDragonNativePhaseTarget(session, dragon, livingMarker, phaseChanged);
                 } else {
                     Location waypoint = session.dragonTargetLocations.get(dragonId);
                     if (waypoint == null) {
                         waypoint = randomDragonSkyTarget(session);
                         session.dragonTargetLocations.put(dragonId, waypoint);
                     }
-                    org.bukkit.entity.ArmorStand marker = dragonWaypointMarker(session, dragonId, waypoint);
-                    dragon.setTarget(marker);
-                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
+                    org.bukkit.entity.ArmorStand waypointMarker = dragonWaypointMarker(session, dragonId, waypoint);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(waypointMarker != null);
+                    boolean phaseChanged = dragon.getPhase() != phase;
+                    if (phaseChanged) dragon.setPhase(phase);
+                    dragon.setTarget(waypointMarker);
+                    if (waypointMarker != null) {
+                        setDragonNativePhaseTarget(session, dragon, waypointMarker, phaseChanged);
+                    }
                 }
             }
 
@@ -17281,7 +17295,6 @@ public final class ArcadePortManager implements Listener {
                 session.dragonSparklerItems.remove(sparklerId);
                 session.dragonSparklerStyles.remove(sparklerId);
                 session.dragonSparklerOwners.remove(sparklerId);
-                session.dragonSparklerLanded.remove(sparklerId);
                 UUID markerId = session.dragonSparklerMarkerByItem.remove(sparklerId);
                 if (markerId != null) {
                     session.dragonSparklerTargetByDragon.entrySet().removeIf(e -> markerId.equals(e.getValue()));
@@ -17297,7 +17310,7 @@ public final class ArcadePortManager implements Listener {
                 item.remove();
                 continue;
             }
-            if (item.isOnGround() && session.dragonSparklerLanded.add(sparklerId)) {
+            if (ArcadePortRules.shouldRenderDragonSparklerBurst(perkUpdate, item.isValid())) {
                 renderDragonSparklerBurst(session, item.getLocation(),
                         session.dragonSparklerStyles.getOrDefault(sparklerId, "golden-thread"));
             }
@@ -17394,6 +17407,17 @@ public final class ArcadePortManager implements Listener {
             z = maxZ > minZ ? Math.max(minZ, Math.min(maxZ, z)) : mapData.centerZ();
         }
         return new Location(session.world, x, y, z);
+    }
+
+    private void setDragonNativePhaseTarget(Session session, EnderDragon dragon,
+            org.bukkit.entity.LivingEntity target, boolean phaseChanged) {
+        UUID dragonId = dragon.getUniqueId();
+        UUID targetId = target == null ? null : target.getUniqueId();
+        UUID previousTargetId = session.dragonNativePhaseTargets.get(dragonId);
+        if (!ArcadePortRules.shouldRefreshDragonPhaseTarget(previousTargetId, targetId, phaseChanged)) return;
+        if (DragonPhaseTargetAccess.setStrafingTarget(dragon, target)) {
+            session.dragonNativePhaseTargets.put(dragonId, targetId);
+        }
     }
 
     private org.bukkit.entity.ArmorStand dragonWaypointMarker(Session session, UUID dragonId, Location target) {
@@ -17579,19 +17603,20 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void renderDragonSparklerBurst(Session session, Location location, String style) {
-        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()
-                || style == null || location == null || location.getWorld() == null) return;
+        if (location == null || location.getWorld() == null) return;
         var world = location.getWorld();
         List<Player> receivers = session == null ? List.of() : new ArrayList<>(session.players.values());
         if (receivers.isEmpty()) return;
+        boolean cosmeticEnabled = GameDebugRuntimeOverrides.globalCosmeticsEnabled()
+                && style != null && !"disabled".equalsIgnoreCase(style);
         FireworkEffect.Builder effect = FireworkEffect.builder().with(FireworkEffect.Type.BURST);
-        switch (style == null ? "golden-thread" : style) {
+        switch (cosmeticEnabled ? style : "source-default") {
             case "cinder-drift" -> { effect.withColor(Color.ORANGE, Color.RED); world.spawnParticle(Particle.FLAME, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
             case "glacier-dust" -> { effect.withColor(Color.AQUA, Color.WHITE); world.spawnParticle(Particle.SNOWFLAKE, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
             case "void-motes" -> { effect.withColor(Color.PURPLE, Color.FUCHSIA); world.spawnParticle(Particle.PORTAL, receivers, null, location.getX(), location.getY(), location.getZ(), 6, 0.10D, 0.10D, 0.10D, 0.02D, null, true); }
             case "starlight" -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.ELECTRIC_SPARK, receivers, null, location.getX(), location.getY(), location.getZ(), 7, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
             case "prismatic" -> { effect.withColor(Color.AQUA, Color.LIME, Color.FUCHSIA); world.spawnParticle(Particle.ENCHANT, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
-            default -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.END_ROD, receivers, null, location.getX(), location.getY(), location.getZ(), 4, 0.09D, 0.09D, 0.09D, 0.01D, null, true); }
+            default -> effect.withColor(Color.YELLOW);
         }
         Firework firework = world.spawn(location, Firework.class);
         FireworkMeta meta = firework.getFireworkMeta();
@@ -24301,7 +24326,6 @@ public final class ArcadePortManager implements Listener {
             for (UUID playerId : new ArrayList<>(session.dragonGliderUntil.keySet())) endDragonGlider(session, playerId);
             restoreDragonFrostBlocks(session);
             session.dragonSparklerStyles.clear();
-            session.dragonSparklerLanded.clear();
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             restoreAllDragonEscapeBuilderBricks(session);
