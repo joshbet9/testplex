@@ -7648,6 +7648,20 @@ public final class ArcadePortManager implements Listener {
                 lines.add(ChatColor.RED + "Players Dead");
                 lines.add(ChatColor.WHITE + Integer.toString(Math.max(0, allPlayers.size() - alive.size())));
             }
+        } else if (session.type == ArcadePortGame.SHEEP_QUEST) {
+            int[] sheepCounts = new int[4];
+            for (int owner : session.sheepOwners.values()) {
+                if (owner >= 0 && owner < sheepCounts.length) sheepCounts[owner]++;
+            }
+            lines.addAll(SheepQuestScoreboardRules.teamCountLines(sheepCounts));
+            if (session.liveStarted) {
+                lines.add(" ");
+                lines.add(ChatColor.YELLOW + "Next Sheep");
+                lines.add(ChatColor.WHITE + formatMatchScoreboardTime(session.sheepNextSpawnAt - now));
+                lines.add("  ");
+                lines.add(ChatColor.YELLOW + "Time Left");
+                lines.add(ChatColor.WHITE + formatMatchScoreboardTime(Math.max(0L, session.endsAt - now)));
+            }
         } else if (session.type == ArcadePortGame.SKY_WARS) {
             lines.add(ChatColor.YELLOW + "Players");
             List<Player> alive = alivePlayers(session);
