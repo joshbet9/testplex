@@ -412,7 +412,8 @@ class GameDebugEventCatalogTest {
         assertTrue(kits.contains("kitEnabled(p.getUniqueId(), \"slowball\")"));
         assertTrue(kits.contains("kitEnabled(player.getUniqueId(), \"body-builder\")"));
         assertTrue(kits.contains("kitEnabled(player.getUniqueId(), \"repulsor\")"));
-        assertTrue(monsters.contains("kitEnabled(player.getUniqueId(), \"maverick\")"));
+        assertTrue(monsters.contains("sourceMobBumpTrajectory(ent.getLocation(), player.getLocation())"),
+                "mob knockback uses the full source-game trajectory");
     }
 
     @Test

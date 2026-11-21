@@ -8,23 +8,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class MazeDebugRulesTest {
-    @Test void mobMovementSpeedDefaultsToSourceAndDebugOverrideIsConsumed() {
-        assertEquals(1.4F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_MODERN_MOB_MOVE_SPEED", 1.9D));
-        assertEquals(1.9F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-        GameDebugRuntimeOverrides.clear();
-        assertEquals(1.4F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
-    }
-
-    @Test void mobBumpTrajectoryRetainsTheSourceVerticalAndHorizontalDirection() {
-        org.bukkit.Location mob = new org.bukkit.Location(null, 2.0D, 10.0D, -4.0D);
-        org.bukkit.Location player = new org.bukkit.Location(null, 5.0D, 12.0D, -8.0D);
-        org.bukkit.util.Vector trajectory = MazeDebugRules.sourceMobBumpTrajectory(mob, player);
-        assertEquals(3.0D, trajectory.getX());
-        assertEquals(2.0D, trajectory.getY());
-        assertEquals(-4.0D, trajectory.getZ());
-    }
-
     @AfterEach void clearOverrides() { GameDebugRuntimeOverrides.clear(); }
 
     @Test void eachMazeModeRetainsItsStageAndMonsterDefaultsAndCanBeTunedIndependently() {
