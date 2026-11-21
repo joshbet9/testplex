@@ -34,27 +34,22 @@ public final class UtilEnt {
     public static boolean CreatureMoveFast(Entity ent, Location target, float speed, boolean slow) {
         if (!(ent instanceof Mob) || target == null || ent.getWorld() != target.getWorld()) return false;
         double distSq = offsetSquared(ent.getLocation(), target);
-        if (distSq < 0.01D) {
-            return false;
-        }
-        Location current = ent.getLocation();
-        org.bukkit.util.Vector movement = target.toVector().subtract(current.toVector());
-        movement.setY(0.0D);
-        double distance = movement.length();
+        if (distSq < 0.01D) return false;
+        if (distSq < 4.0D) speed = Math.min(speed, 1.0F);
+
+        Location loc = ent.getLocation();
+        Vector delta = target.toVector().subtract(loc.toVector());
+        delta.setY(0.0D);
+        double distance = delta.length();
         if (distance < 1.0E-6D) return false;
 
-        // Reborn's CreatureMoveFast moves horizontally by speed * 0.175 every
-        // other server tick, caps speed to 1.0 within two blocks, and teleports
-        // the entity while preserving its current height. Keep that exact
-        // cadence in MonsterManager.move(); Paper pathfinder multipliers use a
-        // different scale and made long straight segments run too quickly.
-        double step = MazeDebugRules.sourceMobMoveStep(speed, distSq, distance);
-        org.bukkit.util.Vector delta = movement.normalize().multiply(step);
-        Location next = current.clone().add(delta);
-        next.setY(current.getY());
-        next.setYaw((float) Math.toDegrees(Math.atan2(-delta.getX(), delta.getZ())));
-        next.setPitch(current.getPitch());
-        ent.setVelocity(new org.bukkit.util.Vector());
+        double step = Math.min(speed * 0.175D, distance);
+        Vector movement = delta.normalize().multiply(step);
+        Location next = loc.clone().add(movement);
+        next.setY(loc.getY());
+        next.setYaw((float) Math.toDegrees(Math.atan2(-movement.getX(), movement.getZ())));
+        next.setPitch(loc.getPitch());
+        ent.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         return ent.teleport(next);
     }
 
