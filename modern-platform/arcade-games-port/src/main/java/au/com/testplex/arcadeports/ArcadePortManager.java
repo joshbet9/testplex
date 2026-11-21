@@ -17609,14 +17609,18 @@ public final class ArcadePortManager implements Listener {
         if (receivers.isEmpty()) return;
         boolean cosmeticEnabled = GameDebugRuntimeOverrides.globalCosmeticsEnabled()
                 && style != null && !"disabled".equalsIgnoreCase(style);
-        FireworkEffect.Builder effect = FireworkEffect.builder().with(FireworkEffect.Type.BURST);
+        // The yellow source burst always remains visible. A selected cosmetic adds a
+        // second particle layer; it must not recolour or replace the gameplay effect.
+        FireworkEffect.Builder effect = FireworkEffect.builder()
+                .with(FireworkEffect.Type.BURST)
+                .withColor(Color.YELLOW);
         switch (cosmeticEnabled ? style : "source-default") {
-            case "cinder-drift" -> { effect.withColor(Color.ORANGE, Color.RED); world.spawnParticle(Particle.FLAME, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
-            case "glacier-dust" -> { effect.withColor(Color.AQUA, Color.WHITE); world.spawnParticle(Particle.SNOWFLAKE, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
-            case "void-motes" -> { effect.withColor(Color.PURPLE, Color.FUCHSIA); world.spawnParticle(Particle.PORTAL, receivers, null, location.getX(), location.getY(), location.getZ(), 6, 0.10D, 0.10D, 0.10D, 0.02D, null, true); }
-            case "starlight" -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.ELECTRIC_SPARK, receivers, null, location.getX(), location.getY(), location.getZ(), 7, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
-            case "prismatic" -> { effect.withColor(Color.AQUA, Color.LIME, Color.FUCHSIA); world.spawnParticle(Particle.ENCHANT, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
-            default -> effect.withColor(Color.YELLOW);
+            case "cinder-drift" -> world.spawnParticle(Particle.FLAME, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true);
+            case "glacier-dust" -> world.spawnParticle(Particle.SNOWFLAKE, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true);
+            case "void-motes" -> world.spawnParticle(Particle.PORTAL, receivers, null, location.getX(), location.getY(), location.getZ(), 6, 0.10D, 0.10D, 0.10D, 0.02D, null, true);
+            case "starlight" -> world.spawnParticle(Particle.ELECTRIC_SPARK, receivers, null, location.getX(), location.getY(), location.getZ(), 7, 0.12D, 0.12D, 0.12D, 0.02D, null, true);
+            case "prismatic" -> world.spawnParticle(Particle.ENCHANT, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.12D, 0.12D, 0.12D, 0.02D, null, true);
+            default -> { }
         }
         Firework firework = world.spawn(location, Firework.class);
         FireworkMeta meta = firework.getFireworkMeta();
