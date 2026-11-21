@@ -271,9 +271,11 @@ jobs:
           set -euo pipefail
           installed=/home/monstermaze/servers/testplex-modern/plugins/Arcade.jar
           if sudo -n test -f "$installed"; then
-            descriptor="$(sudo -n unzip -p "$installed" plugin.yml 2>/dev/null || true)"
-            name="$(printf '%s\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
-            [[ "$name" == Arcade ]] && echo true || echo false
+            if sudo -n unzip -p "$installed" plugin.yml 2>/dev/null | grep -Fxq "name: Arcade"; then
+              echo true
+            else
+              echo false
+            fi
           else
             echo false
           fi
@@ -1177,8 +1179,7 @@ jobs:
           done
           if [[ "$ARCADE_CORE_REQUIRED" == true ]]; then
             existing_arcade="$SERVER_DIR/plugins/Arcade.jar"
-            existing_name="$(sudo -n unzip -p "$existing_arcade" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
-            [[ "$existing_name" == Arcade ]] || {
+            sudo -n unzip -p "$existing_arcade" plugin.yml 2>/dev/null | grep -Fxq "name: Arcade" || {
               echo "Previously detected Arcade core disappeared or changed identity; aborting deployment." >&2
               exit 1
             }
@@ -1589,8 +1590,7 @@ jobs:
           fi
 
           if [[ "$ARCADE_CORE_REQUIRED" == true ]]; then
-            installed_name="$(sudo -n unzip -p "$SERVER_DIR/plugins/Arcade.jar" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
-            [[ "$installed_name" == Arcade ]] || {
+            sudo -n unzip -p "$SERVER_DIR/plugins/Arcade.jar" plugin.yml 2>/dev/null | grep -Fxq "name: Arcade" || {
               echo "The refreshed legacy Arcade core is not present after Paper startup." >&2
               rollback
               exit 1
