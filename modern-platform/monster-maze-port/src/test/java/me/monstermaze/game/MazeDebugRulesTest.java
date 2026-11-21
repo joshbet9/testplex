@@ -16,13 +16,18 @@ class MazeDebugRulesTest {
         assertEquals(1.4F, MazeDebugRules.mobMoveSpeed(MazeMode.MODERN));
     }
 
-    @Test void mobBumpTrajectoryRetainsTheSourceVerticalAndHorizontalDirection() {
+    @Test void mobBumpDirectionMatchesSourceAndDoesNotAddVerticalLaunchFromHeightOffset() {
         org.bukkit.Location mob = new org.bukkit.Location(null, 2.0D, 10.0D, -4.0D);
         org.bukkit.Location player = new org.bukkit.Location(null, 5.0D, 12.0D, -8.0D);
         org.bukkit.util.Vector trajectory = MazeDebugRules.sourceMobBumpTrajectory(mob, player);
         assertEquals(3.0D, trajectory.getX());
-        assertEquals(2.0D, trajectory.getY());
+        assertEquals(0.0D, trajectory.getY());
         assertEquals(-4.0D, trajectory.getZ());
+
+        org.bukkit.util.Vector verticalOnly = MazeDebugRules.sourceMobBumpTrajectory(
+                mob, new org.bukkit.Location(null, 2.0D, 14.0D, -4.0D));
+        assertEquals(new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), verticalOnly,
+                "A height difference alone must not turn a source horizontal bump into vertical launch");
     }
 
     @AfterEach void clearOverrides() { GameDebugRuntimeOverrides.clear(); }
