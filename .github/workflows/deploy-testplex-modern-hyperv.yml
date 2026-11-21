@@ -1179,8 +1179,7 @@ jobs:
             existing_arcade="$SERVER_DIR/plugins/Arcade.jar"
             existing_name="$(sudo -n unzip -p "$existing_arcade" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\r")"
             [[ "$existing_name" == Arcade ]] || {
-              echo "Previously detected Arcade core disappeared or changed identity; rolling back." >&2
-              rollback
+              echo "Previously detected Arcade core disappeared or changed identity; aborting deployment." >&2
               exit 1
             }
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/ArcadeCore.jar" "$existing_arcade"
