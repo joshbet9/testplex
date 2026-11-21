@@ -17075,7 +17075,7 @@ public final class ArcadePortManager implements Listener {
                 EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(initialTarget != null);
                 dragon.setPhase(initialPhase);
                 dragon.setTarget(initialTarget);
-                if (initialTarget != null) setDragonNativePhaseTarget(session, dragon, initialTarget, true);
+                if (initialTarget != null) setDragonNativePhaseTarget(session, dragon, initialTarget);
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -17209,21 +17209,18 @@ public final class ArcadePortManager implements Listener {
                         && session.alive.contains(selectedPlayer.getUniqueId())) {
                     removeDragonWaypointMarker(session, dragonId);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(selectedPlayer);
-                    // Mob#setTarget updates the general target only. The native dragon flight phase
-                    // has its own attackTarget; refresh only on target/phase changes so its native
-                    // path is not discarded every 125 ms while tracking a moving player.
-                    setDragonNativePhaseTarget(session, dragon, selectedPlayer, phaseChanged);
+                    // CHARGE_PLAYER follows a native position target. Refresh that position on the
+                    // source FASTEST cadence so a moving player or sparkler remains the destination.
+                    setDragonNativePhaseTarget(session, dragon, selectedPlayer);
                 } else if (selectedMarker instanceof org.bukkit.entity.LivingEntity livingMarker
                         && selectedMarker.isValid()) {
                     removeDragonWaypointMarker(session, dragonId);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(livingMarker);
-                    setDragonNativePhaseTarget(session, dragon, livingMarker, phaseChanged);
+                    setDragonNativePhaseTarget(session, dragon, livingMarker);
                 } else {
                     Location waypoint = session.dragonTargetLocations.get(dragonId);
                     if (waypoint == null) {
@@ -17232,11 +17229,10 @@ public final class ArcadePortManager implements Listener {
                     }
                     org.bukkit.entity.ArmorStand waypointMarker = dragonWaypointMarker(session, dragonId, waypoint);
                     EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(waypointMarker != null);
-                    boolean phaseChanged = dragon.getPhase() != phase;
-                    if (phaseChanged) dragon.setPhase(phase);
+                    if (dragon.getPhase() != phase) dragon.setPhase(phase);
                     dragon.setTarget(waypointMarker);
                     if (waypointMarker != null) {
-                        setDragonNativePhaseTarget(session, dragon, waypointMarker, phaseChanged);
+                        setDragonNativePhaseTarget(session, dragon, waypointMarker);
                     }
                 }
             }
@@ -17410,12 +17406,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setDragonNativePhaseTarget(Session session, EnderDragon dragon,
-            org.bukkit.entity.LivingEntity target, boolean phaseChanged) {
+            org.bukkit.entity.LivingEntity target) {
         UUID dragonId = dragon.getUniqueId();
         UUID targetId = target == null ? null : target.getUniqueId();
-        UUID previousTargetId = session.dragonNativePhaseTargets.get(dragonId);
-        if (!ArcadePortRules.shouldRefreshDragonPhaseTarget(previousTargetId, targetId, phaseChanged)) return;
-        if (DragonPhaseTargetAccess.setStrafingTarget(dragon, target)) {
+        if (DragonPhaseTargetAccess.setChargeTarget(dragon, target == null ? null : target.getLocation())) {
             session.dragonNativePhaseTargets.put(dragonId, targetId);
         }
     }
@@ -27591,9 +27585,21 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
                     + (stage > 0 ? "Stage " + stage : "Not recorded"));
             if (showStatsPlacementDetails(viewer, "monster-maze") && stage > 0) {
-                int rank = leaderboard == null ? 0
-                        : leaderboard.getKitPatternRank(mode, pattern, targetId, targetName, kit.id);
-                lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + (rank > 0 ? "#" + rank : "Not recorded"));
+                List<me.monstermaze.stats.LeaderboardManager.Entry> rows = leaderboard == null
+                        ? List.of() : leaderboard.getKitPatternLeaderboard(mode, pattern, kit.id, 10_000);
+                int rank = 1;
+                boolean found = false;
+                for (var row : rows) {
+                    if (row.name != null && row.name.equalsIgnoreCase(targetName)
+                            && row.kit != null && row.kit.equalsIgnoreCase(kit.id)) {
+                        lore.add(ChatColor.GOLD + "Placement: " + ChatColor.WHITE + "#" + rank);
+                        found = true;
+                        break;
+                    }
+                    rank++;
+                }
+                if (!found) lore.add(ChatColor.GOLD + "Placement: " + ChatColor.GRAY
+                        + "Not ranked on this kit's pattern board");
             }
             lore.add(ChatColor.GRAY + "Shift-left-click Personal Bests to toggle placements.");
             inventory.setItem(18 + columns.get(index),
