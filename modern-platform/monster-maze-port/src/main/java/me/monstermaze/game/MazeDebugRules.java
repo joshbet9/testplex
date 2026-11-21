@@ -7,10 +7,9 @@ import org.bukkit.util.Vector;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
-    // Reborn 1.21 source speed passed to CreatureMoveFast. The source applies
-    // this as a fixed horizontal step every other tick, not as a pathfinder
-    // speed multiplier.
-    public static final float MOB_MOVE_SPEED = 0.8F;
+    // Keep the pre-change direct movement algorithm, but slow its source value by 25%.
+    // The debug profile can still override this default for controlled comparisons.
+    public static final float MOB_MOVE_SPEED = 0.6F;
     private static final double SOURCE_MOVE_STEP_MULTIPLIER = 0.175D;
     public static final int STAGE_TIMER_INITIAL_SECONDS = 60;
     public static final double STAGE_TIMER_DECREASE_PER_STAGE_SECONDS = 2.0D;
