@@ -1073,8 +1073,8 @@ public final class CameraShyGame implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onSwapHands(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
-        if (phase != Phase.LIVE || !isAliveParticipant(player)) return;
-        if (player.getInventory().getItemInMainHand().getType() != Material.SPYGLASS) return;
+        if (!CameraShyRules.shouldTriggerPhoto(phase == Phase.LIVE, isAliveParticipant(player),
+                player.getInventory().getItemInMainHand().getType() == Material.SPYGLASS)) return;
         event.setCancelled(true);
         triggerPhoto(player);
     }
@@ -1082,10 +1082,6 @@ public final class CameraShyGame implements Listener {
     private void triggerPhoto(Player player) {
         emitCameraFlash(player.getLocation());
         manager.showAbilityActivationCosmetic(player, ArcadePortGame.CAMERA_SHY);
-        if (!isUsingSpyglass(player)) {
-            player.sendActionBar(Component.text("Right-click and hold the spyglass before pressing F to take a photo."));
-            return;
-        }
         takePhoto(player);
     }
 
