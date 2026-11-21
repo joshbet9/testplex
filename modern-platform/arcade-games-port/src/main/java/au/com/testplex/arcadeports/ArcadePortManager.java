@@ -8795,6 +8795,13 @@ public final class ArcadePortManager implements Listener {
                         "Tracks the nearest opposing Death Tag player."));
             }
             viewer.setCompassTarget(target.getLocation());
+            if (isDeathTagTrackingCompass(viewer.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(viewer.getLocation().distanceSquared(target.getLocation()));
+                double height = target.getLocation().getY() - viewer.getLocation().getY();
+                boolean targetChaser = session.tagged.contains(target.getUniqueId());
+                viewer.sendActionBar(ArcadePortRules.deathTagCompassActionBar(
+                        target.getName(), targetChaser, distance, height));
+            }
         }
     }
 
