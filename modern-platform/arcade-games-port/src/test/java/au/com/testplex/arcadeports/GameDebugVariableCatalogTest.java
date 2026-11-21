@@ -385,6 +385,26 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void modernMonsterMazeDebugDefaultsMatchTheLiveModeInsteadOfLegacySharedConstants() {
+        for (ArcadePortGame game : List.of(ArcadePortGame.MONSTER_MAZE,
+                ArcadePortGame.MONSTER_MAZE_MODERN)) {
+            String prefix = GameDebugVariableCatalog.rulePrefix(game);
+            assertEquals(35.0D, GameDebugVariableCatalog.variable(game,
+                    prefix + "STAGE_TIMER_INITIAL_SECONDS").defaultValue());
+            assertEquals(20.0D / 9.0D, GameDebugVariableCatalog.variable(game,
+                    prefix + "STAGE_TIMER_DECREASE_PER_STAGE_SECONDS").defaultValue());
+            assertEquals(225.0D, GameDebugVariableCatalog.variable(game,
+                    prefix + "INITIAL_MONSTER_COUNT").defaultValue());
+            assertEquals(30.0D, GameDebugVariableCatalog.variable(game,
+                    prefix + "ADDITIONAL_MONSTERS_PER_SAFE_PAD").defaultValue());
+        }
+        assertEquals(60.0D, GameDebugVariableCatalog.variable(ArcadePortGame.MONSTER_MAZE_SPEED,
+                "MONSTER_MAZE_SPEED_STAGE_TIMER_INITIAL_SECONDS").defaultValue());
+        assertEquals(150.0D, GameDebugVariableCatalog.variable(ArcadePortGame.MONSTER_MAZE_SPEED,
+                "MONSTER_MAZE_SPEED_INITIAL_MONSTER_COUNT").defaultValue());
+    }
+
+    @Test
     void everyLiteralRuntimeOverrideHasAProfileMenuEntry() {
         var catalogKeys = java.util.Arrays.stream(ArcadePortGame.values())
                 .flatMap(game -> GameDebugVariableCatalog.variables(game).stream())

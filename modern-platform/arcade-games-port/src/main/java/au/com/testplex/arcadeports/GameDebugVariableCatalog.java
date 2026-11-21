@@ -162,6 +162,7 @@ final class GameDebugVariableCatalog {
                 Object raw = field.get(null);
                 double value = raw instanceof Boolean enabled ? (enabled ? 1.0D : 0.0D)
                         : ((Number) raw).doubleValue();
+                value = effectiveDefault(game, name, value);
                 double minimum = minimum(name, value, kind);
                 double maximum = maximum(name, kind, value);
                 if (game == ArcadePortGame.SUPER_SPLOOR && source == SuperSploorRules.class) {
@@ -195,6 +196,21 @@ final class GameDebugVariableCatalog {
         }
         result.sort(Comparator.comparing(Variable::key));
         return List.copyOf(result);
+    }
+
+    private static double effectiveDefault(ArcadePortGame game, String name, double fallback) {
+        // The visible Monster Maze selection now runs Modern. These fields have mode-specific
+        // runtime fallbacks, so displaying the shared legacy constants is misleading.
+        if (game == ArcadePortGame.MONSTER_MAZE || game == ArcadePortGame.MONSTER_MAZE_MODERN) {
+            return switch (name) {
+                case "STAGE_TIMER_INITIAL_SECONDS" -> 35.0D;
+                case "STAGE_TIMER_DECREASE_PER_STAGE_SECONDS" -> 20.0D / 9.0D;
+                case "INITIAL_MONSTER_COUNT" -> 225.0D;
+                case "ADDITIONAL_MONSTERS_PER_SAFE_PAD" -> 30.0D;
+                default -> fallback;
+            };
+        }
+        return fallback;
     }
 
     static Variable variable(ArcadePortGame game, String key) {
