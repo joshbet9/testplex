@@ -17060,22 +17060,13 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 UUID dragonId = dragon.getUniqueId();
-                // Acquire a racer immediately. The old altitude gate could strand the
-                // dragon in FLY_TO_PORTAL on a custom map indefinitely.
-                Player initialTarget = possibleTargets.isEmpty() ? null
-                        : possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size()));
-                if (initialTarget != null) {
-                    session.dragonTargetPlayers.put(dragonId, initialTarget.getUniqueId());
-                    session.dragonTargetLocations.put(dragonId, initialTarget.getLocation().clone());
-                } else {
-                    Location initialSkyTarget = randomDragonSkyTarget(session);
-                    session.dragonTargetLocations.put(dragonId, initialSkyTarget);
-                    dragon.setPodium(initialSkyTarget);
-                }
-                EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(initialTarget != null);
+                // Reborn starts each dragon on a sky waypoint, then switches between
+                // waypoints and players as it reaches its current target.
+                Location initialSkyTarget = randomDragonSkyTarget(session);
+                session.dragonTargetLocations.put(dragonId, initialSkyTarget);
+                EnderDragon.Phase initialPhase = ArcadePortRules.dragonsAutonomousPhase(false);
                 dragon.setPhase(initialPhase);
-                dragon.setTarget(initialTarget);
-                if (initialTarget != null) setDragonNativePhaseTarget(session, dragon, initialTarget);
+                dragon.setTarget(null);
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -17175,12 +17166,13 @@ public final class ArcadePortManager implements Listener {
                 // treat the saved map coordinates as a destination.
                 double targetDistanceSquared = target == null ? Double.POSITIVE_INFINITY
                         : dragon.getLocation().distanceSquared(target);
-                boolean needsRacerTarget = ArcadePortRules.dragonsShouldAcquireRacer(
-                        possibleTargets.size(), sparklerMarker != null) && targetPlayerId == null;
-                if (sparklerMarker == null && (needsRacerTarget || ArcadePortRules.shouldRetargetDragon(
-                        dragon.getLocation().getY(), targetDistanceSquared, target != null))) {
+                boolean shouldRetarget = ArcadePortRules.shouldRetargetDragon(
+                        dragon.getLocation().getY(), targetDistanceSquared, target != null);
+                if (sparklerMarker == null && shouldRetarget) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
-                    if (!possibleTargets.isEmpty()) {
+                    double spectatorY = dragonSpectatorLocation(session).getY();
+                    if (dragon.getLocation().getY() >= ArcadePortRules.DRAGONS_RETARGET_ALTITUDE_Y
+                            && dragon.getLocation().getY() > spectatorY && !possibleTargets.isEmpty()) {
                         Player newTarget = possibleTargets.get(
                                 ThreadLocalRandom.current().nextInt(possibleTargets.size()));
                         session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
