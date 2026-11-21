@@ -343,16 +343,27 @@ public class MonsterManager {
 
                 markBump(player);
 
-                double floorY = game.getCenter().getY();
-                double above = player.getLocation().getY() - floorY;
-                if (above >= 0.0 && above < 0.9) {
-                    Location up = player.getLocation().clone();
-                    up.setY(floorY + 0.7);
-                    player.teleport(up);
+                Vector knockDirection;
+                if (km != null && km.getKit(player) == me.monstermaze.kit.KitType.MAVERICK) {
+                    Location target = game.getMobKnockTarget();
+                    if (target != null && target.getWorld() == player.getWorld()) {
+                        knockDirection = target.toVector().subtract(player.getLocation().toVector());
+                        knockDirection.setY(0);
+                        if (knockDirection.lengthSquared() > 0.001D) knockDirection.normalize();
+                        else knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
+                                ent.getLocation(), player.getLocation());
+                    } else {
+                        knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
+                                ent.getLocation(), player.getLocation());
+                    }
+                } else {
+                    knockDirection = MazeDebugRules.sourceMobBumpTrajectory(
+                            ent.getLocation(), player.getLocation());
                 }
 
-                Vector sourceTrajectory = MazeDebugRules.sourceMobBumpTrajectory(ent.getLocation(), player.getLocation());
-                UtilAction.velocity(player, sourceTrajectory,
+                // Preserve the source launch calculation exactly; do not snap the player upward
+                // before applying it. The snap added extra height unrelated to the source impulse.
+                UtilAction.velocity(player, knockDirection,
                         MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
                         false, 0,
                         MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
