@@ -20283,7 +20283,6 @@ public final class ArcadePortManager implements Listener {
             passenger.leaveVehicle();
             if (passenger instanceof Sheep sheep) {
                 session.sheepCarriers.remove(sheep);
-            session.sheepHolders.remove(sheep);
                 session.sheepHolders.remove(sheep);
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
                 sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : DyeColor.WHITE);
@@ -20779,11 +20778,17 @@ public final class ArcadePortManager implements Listener {
                 // by the carrier entering the team's pen.
                 if (!isInsideSheepPen(session, carrier.getLocation(), team)) continue;
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
-                // SetOwner returns immediately for sheep already belonging to this team;
-                // those sheep remain passengers and still count while standing in the pen.
-                if (owner == team) continue;
-                sheep.leaveVehicle();
-                captureSheepQuestForTeam(session, sheep, team);
+                if (SheepQuestEntityRules.shouldCaptureOnDelivery(owner, team)) {
+                    captureSheepQuestForTeam(session, sheep, team);
+                } else {
+                    // A carrier can pick up their own sheep outside the pen. Delivery
+                    // should still unload it, but must not score a second capture.
+                    sheep.leaveVehicle();
+                    session.sheepCarriers.remove(sheep);
+                    session.sheepHolders.remove(sheep);
+                    sheep.setAI(true);
+                    sheep.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                }
             }
             updateSheepQuestCarryUi(session, carrier);
         }

@@ -9,8 +9,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class SheepQuestEntityRulesTest {
+    @Test void deliveryCapturesUnownedOrEnemySheepButReleasesAlreadyOwnedSheep() {
+        assertTrue(SheepQuestEntityRules.shouldCaptureOnDelivery(-1, 2));
+        assertTrue(SheepQuestEntityRules.shouldCaptureOnDelivery(1, 2));
+        assertFalse(SheepQuestEntityRules.shouldCaptureOnDelivery(2, 2));
+    }
+
     @Test void hidesSpawnSheepNameTagWithoutChangingOtherEntityState() {
         AtomicReference<String> customName = new AtomicReference<>("Sheep");
         AtomicBoolean visible = new AtomicBoolean(true);
