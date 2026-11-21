@@ -12,6 +12,27 @@ if [ "$actual_sha" != "$expected_sha" ]; then
     exit 1
 fi
 
+# The legacy Arcade core is optional on modern servers. If it was already
+# installed, verify the image's hunger-guard build replaced that exact plugin.
+legacy_arcade="$server_root/plugins/Arcade.jar"
+packaged_arcade="$root/opt/testplex/plugins/Arcade.jar"
+if [ -f "$legacy_arcade" ]; then
+    legacy_name="$(unzip -p "$legacy_arcade" plugin.yml 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"\\r")"
+    if [ "$legacy_name" = "Arcade" ]; then
+        [ -s "$packaged_arcade" ] || {
+            echo "Fly image is missing the packaged Arcade core for the installed legacy plugin." >&2
+            exit 1
+        }
+        installed_sha="$(sha256sum "$legacy_arcade" | awk '{print $1}')"
+        packaged_sha="$(sha256sum "$packaged_arcade" | awk '{print $1}')"
+        [ "$installed_sha" = "$packaged_sha" ] || {
+            echo "Installed Fly Arcade core does not match the hunger-guard build in the image." >&2
+            exit 1
+        }
+        echo "TESTPLEX_FLY_ARCADE_CORE_VERIFIED:$installed_sha"
+    fi
+fi
+
 monster_maze_assets="$root/opt/testplex/MonsterMazeMaps"
 monster_maze_revision_file="$monster_maze_assets/.testplex-mm-source-maps"
 if [ ! -s "$monster_maze_revision_file" ] || ! grep -Eq '^[0-9a-f]{40}$' "$monster_maze_revision_file"; then
