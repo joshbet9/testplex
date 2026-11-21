@@ -67,6 +67,18 @@ class LeaderboardManagerKitLeaderboardTest {
     }
 
     @Test
+    void recordsKitBestEvenWhenItIsBelowThePlayersOverallBestOnAnotherKit() {
+        YamlConfiguration records = new YamlConfiguration();
+        UUID player = UUID.randomUUID();
+
+        assertTrue(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 0, player, "brawler", 25));
+        assertTrue(LeaderboardManager.storeKitPB(records, MazeMode.MODERN, 0, player, "jumper", 12));
+
+        assertEquals(25, LeaderboardManager.storedKitPB(records, MazeMode.MODERN, 0, player, "brawler"));
+        assertEquals(12, LeaderboardManager.storedKitPB(records, MazeMode.MODERN, 0, player, "jumper"));
+    }
+
+    @Test
     void retainsKitBestPerPatternAndDoesNotLetOneMazeOverwriteAnother() {
         YamlConfiguration records = new YamlConfiguration();
         UUID player = UUID.randomUUID();
