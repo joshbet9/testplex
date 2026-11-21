@@ -95,15 +95,10 @@ public final class MazeDebugRules {
             double distanceSquared) {
         double radius = Math.max(0.1D, doubleValue(mode, "BUMP_RADIUS_BLOCKS", BUMP_RADIUS_BLOCKS));
         double radiusSquared = radius * radius;
-        // Mob and player feet can be at different Y levels while their hitboxes
-        // still overlap (e.g. after a launch or jump). A spherical feet-to-feet
-        // check silently misses those contacts. Keep the configured horizontal
-        // range, but permit vertical overlap with the source mob hitbox.
-        double verticalDistanceSquared = distanceSquared - horizontalDistanceSquared;
+        // Mineplex used a 3D feet-to-feet distance check for mob contact.
         return Double.isFinite(horizontalDistanceSquared) && Double.isFinite(distanceSquared)
-                && horizontalDistanceSquared >= 0.0D && verticalDistanceSquared >= 0.0D
-                && horizontalDistanceSquared < radiusSquared
-                && verticalDistanceSquared < 1.9D * 1.9D;
+                && horizontalDistanceSquared >= 0.0D && distanceSquared >= 0.0D
+                && distanceSquared < radiusSquared;
     }
 
     public static boolean isBumpCooldownReady(MazeMode mode, long nowMillis, long lastBumpMillis) {
