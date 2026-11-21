@@ -70,6 +70,8 @@ RUN set -eu; \
 
 COPY modern-platform/target/TestplexModernArcade.jar /opt/testplex/plugins/TestplexModernArcade.jar
 COPY modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar /opt/testplex/plugins/ArcadeMechanicsModern.jar
+# Refresh the legacy Arcade core only when the existing persistent plugin set already has it.
+COPY modern-platform/target/ArcadeCore.jar /opt/testplex/plugins/Arcade.jar
 COPY deploy/fly/WizardsSourceMaps.tar.gz /opt/testplex/WizardsSourceMaps.tar.gz
 COPY deploy/fly/provision-monster-maze-worlds.sh /usr/local/bin/provision-monster-maze-worlds
 COPY deploy/fly/entrypoint.sh /usr/local/bin/testplex-entrypoint

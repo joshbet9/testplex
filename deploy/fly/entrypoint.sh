@@ -53,6 +53,20 @@ for plugin in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
     rm -f -- "$volume_plugin"
     ln -s -- "$source_plugin" "$volume_plugin"
 done
+
+# Refresh the legacy Arcade core only when this persistent server already has it.
+# A modern-only server must not gain a second, legacy Arcade plugin.
+legacy_arcade="$PLUGIN_DIR/Arcade.jar"
+packaged_arcade="/opt/testplex/plugins/Arcade.jar"
+if [[ -f "$legacy_arcade" && ! -L "$legacy_arcade" && -f "$packaged_arcade" ]] &&
+   unzip -p "$legacy_arcade" plugin.yml 2>/dev/null | grep -Fxq "name: Arcade"; then
+    unzip -p "$packaged_arcade" plugin.yml | grep -Fxq "name: Arcade" || {
+        echo "FATAL: packaged hunger-guard core has an unexpected plugin descriptor." >&2
+        exit 1
+    }
+    install -o minecraft -g minecraft -m 0644 "$packaged_arcade" "$legacy_arcade"
+    echo "Refreshed the already-installed Arcade core with the shared modern-session hunger guard."
+fi
 install -o minecraft -g minecraft -m 0644 /opt/testplex/fake-player-plugin.jar "$PLUGIN_DIR/FakePlayerPlugin.jar"
 install -o minecraft -g minecraft -m 0644 /opt/testplex/packetevents.jar "$PLUGIN_DIR/PacketEvents.jar"
 
