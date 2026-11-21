@@ -58,9 +58,9 @@ class MazeDebugRulesTest {
     @Test void bumpRangeDamageAndCooldownSettingsChangeProductionPredicates() {
         assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.9D, 0.9D));
         assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.0D, 0.5D));
-        // A 1-block height difference can still be physical contact with
-        // the 1.9-block-high mob hitbox; the old spherical origin test missed it.
-        assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.25D, 1.25D));
+        // Source uses a spherical feet-to-feet distance under one block, not a
+        // horizontal radius plus a tall synthetic mob hitbox.
+        assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.25D, 1.25D));
         assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.25D, 4.25D));
 
         assertEquals(4.0D, MazeDebugRules.bumpDamage(MazeMode.ORIGINAL));
@@ -71,13 +71,13 @@ class MazeDebugRulesTest {
                 "MONSTER_MAZE_BUMP_RADIUS_BLOCKS", 1.5D,
                 "MONSTER_MAZE_BUMP_DAMAGE", 7.0D,
                 "MONSTER_MAZE_PLAYER_BUMP_COOLDOWN_MILLIS", 200L));
-        assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.5D, 1.8D));
+        assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.0D, 1.2D));
         assertEquals(7.0D, MazeDebugRules.bumpDamage(MazeMode.ORIGINAL));
         assertTrue(MazeDebugRules.isBumpCooldownReady(MazeMode.ORIGINAL, 1_200L, 1_000L));
         assertEquals(4.0D, MazeDebugRules.bumpDamage(MazeMode.SPEED), "mode-specific values must remain isolated");
 
         GameDebugRuntimeOverrides.clear();
-        assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.5D, 1.8D));
+        assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.0D, 1.2D));
         assertEquals(4.0D, MazeDebugRules.bumpDamage(MazeMode.ORIGINAL));
         assertFalse(MazeDebugRules.isBumpCooldownReady(MazeMode.ORIGINAL, 1_200L, 1_000L));
     }
